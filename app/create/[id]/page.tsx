@@ -1,15 +1,23 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use, useState, useEffect } from 'react';
 import { templates } from '@/app/data/templates';
 import { BiodataForm, defaultBiodataForm } from '@/app/types/biodata';
-import ClassicEleganceTemplate from '@/app/components/templates/ClassicEleganceTemplate';
-import { Download, Upload, FileText, Image as ImageIcon, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import GenericTemplate from '@/app/components/templates/GenericTemplate';
+import { Download, Upload, FileText, Image as ImageIcon, Loader2, ChevronDown, ChevronUp, Lock } from 'lucide-react';
 import { generatePDF, generateImage } from '@/app/utils/pdfGenerator';
+import Script from 'next/script';
+import { useLanguage } from '@/app/context/LanguageContext';
 
 type PageProps = {
   params: Promise<{ id: string }>;
 };
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 export default function CreatePage({ params }: PageProps) {
   const { id } = use(params);
@@ -23,6 +31,15 @@ export default function CreatePage({ params }: PageProps) {
     contact: true,
     optional: false
   });
+  const [isPaid, setIsPaid] = useState(false);
+  const { t } = useLanguage();
+
+  // If template is free, mark as paid automatically
+  useEffect(() => {
+    if (template?.free) {
+      setIsPaid(true);
+    }
+  }, [template]);
 
   const updateForm = (field: keyof BiodataForm, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -43,42 +60,74 @@ export default function CreatePage({ params }: PageProps) {
     }
   };
 
-  const handleDownloadPDF = async () => {
+  const handlePayment = async () => {
+    if (!template) return;
+
+    setIsDownloading(true);
     try {
-      setIsDownloading(true);
-      setShowDownloadMenu(false);
-      const filename = `${form.name.replace(/\s+/g, '_') || 'biodata'}_biodata.pdf`;
-      await generatePDF('biodata-template', filename);
+      const response = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ amount: template.price }),
+      });
+
+      const order = await response.json();
+
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_1234567890', // Fallback for dev
+        amount: order.amount,
+        currency: order.currency,
+        name: 'Biodata Maker',
+        description: `Payment for ${template.name}`,
+        order_id: order.id,
+        handler: function (response: any) {
+          // Verify payment on backend ideally, but for now trust frontend
+          setIsPaid(true);
+          alert('Payment Successful! You can now download your biodata.');
+        },
+        prefill: {
+          name: form.name,
+          email: form.email,
+          contact: form.contactNumber,
+        },
+        theme: {
+          color: '#db2777',
+        },
+      };
+
+      const rzp1 = new window.Razorpay(options);
+      rzp1.open();
     } catch (error) {
-      alert('Error generating PDF. Please try again.');
-      console.error(error);
+      console.error('Payment failed', error);
+      // For development/demo without keys, simulate success
+      if (confirm('Razorpay keys missing or error. Simulate success?')) {
+         setIsPaid(true);
+      }
     } finally {
       setIsDownloading(false);
     }
   };
 
-  const handleDownloadPNG = async () => {
-    try {
-      setIsDownloading(true);
-      setShowDownloadMenu(false);
-      const filename = `${form.name.replace(/\s+/g, '_') || 'biodata'}_biodata.png`;
-      await generateImage('biodata-template', 'png', filename);
-    } catch (error) {
-      alert('Error generating PNG. Please try again.');
-      console.error(error);
-    } finally {
-      setIsDownloading(false);
+  const handleDownload = async (format: 'pdf' | 'png' | 'jpg') => {
+    if (!isPaid) {
+      await handlePayment();
+      return;
     }
-  };
 
-  const handleDownloadJPG = async () => {
     try {
       setIsDownloading(true);
       setShowDownloadMenu(false);
-      const filename = `${form.name.replace(/\s+/g, '_') || 'biodata'}_biodata.jpg`;
-      await generateImage('biodata-template', 'jpg', filename);
+      const filename = `${form.name.replace(/\s+/g, '_') || 'biodata'}_biodata.${format}`;
+      
+      if (format === 'pdf') {
+        await generatePDF('biodata-template', filename);
+      } else {
+        await generateImage('biodata-template', format, filename);
+      }
     } catch (error) {
-      alert('Error generating JPG. Please try again.');
+      alert(`Error generating ${format.toUpperCase()}. Please try again.`);
       console.error(error);
     } finally {
       setIsDownloading(false);
@@ -89,33 +138,53 @@ export default function CreatePage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" />
+      
       {/* Header */}
       <div className="bg-white border-b shadow-sm sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Create Your Biodata</h1>
-            <p className="text-sm text-gray-600 mt-1">Fill in your details and download</p>
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Create Your Biodata</h1>
+            <p className="text-sm text-gray-600 mt-1">
+              Template: <span className="font-semibold text-pink-600">{template.name}</span>
+              {!template.free && !isPaid && (
+                <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full border border-yellow-200">
+                  ₹{template.price}
+                </span>
+              )}
+            </p>
           </div>
           
           {/* Download Button */}
           <div className="relative">
-            <button
-              onClick={() => setShowDownloadMenu(!showDownloadMenu)}
-              disabled={isDownloading}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-            >
-              {isDownloading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Download className="w-5 h-5" />
-                  Download
-                </>
-              )}
-            </button>
+            {!isPaid ? (
+               <button
+                onClick={handlePayment}
+                disabled={isDownloading}
+                className="flex items-center gap-2 px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-yellow-500 to-amber-600 text-white rounded-lg hover:shadow-lg transition disabled:opacity-50 font-semibold"
+              >
+                {isDownloading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-4 h-4" />}
+                <span>Pay ₹{template.price} to Download</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                disabled={isDownloading}
+                className="flex items-center gap-2 px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+              >
+                {isDownloading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span className="hidden md:inline">Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-5 h-5" />
+                    <span>Download</span>
+                  </>
+                )}
+              </button>
+            )}
 
             {showDownloadMenu && !isDownloading && (
               <>
@@ -125,7 +194,7 @@ export default function CreatePage({ params }: PageProps) {
                 />
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 z-20 overflow-hidden">
                   <button
-                    onClick={handleDownloadPDF}
+                    onClick={() => handleDownload('pdf')}
                     className="w-full px-4 py-3 text-left hover:bg-pink-50 transition flex items-center gap-3 border-b"
                   >
                     <FileText className="w-5 h-5 text-red-600" />
@@ -136,7 +205,7 @@ export default function CreatePage({ params }: PageProps) {
                   </button>
                   
                   <button
-                    onClick={handleDownloadPNG}
+                    onClick={() => handleDownload('png')}
                     className="w-full px-4 py-3 text-left hover:bg-pink-50 transition flex items-center gap-3 border-b"
                   >
                     <ImageIcon className="w-5 h-5 text-blue-600" />
@@ -147,7 +216,7 @@ export default function CreatePage({ params }: PageProps) {
                   </button>
                   
                   <button
-                    onClick={handleDownloadJPG}
+                    onClick={() => handleDownload('jpg')}
                     className="w-full px-4 py-3 text-left hover:bg-pink-50 transition flex items-center gap-3"
                   >
                     <ImageIcon className="w-5 h-5 text-green-600" />
@@ -166,12 +235,12 @@ export default function CreatePage({ params }: PageProps) {
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-5 gap-6">
           {/* Left - Form (3 columns) */}
-          <div className="lg:col-span-3 space-y-4">
+          <div className="lg:col-span-3 space-y-4 order-2 lg:order-1">
             {/* Photo Upload Card */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                 <Upload className="w-5 h-5 text-pink-600" />
-                Upload Photo
+                {t.form.uploadPhoto}
               </h3>
               <div className="flex items-center gap-4">
                 {form.photo && (
@@ -179,7 +248,7 @@ export default function CreatePage({ params }: PageProps) {
                 )}
                 <label className="cursor-pointer px-6 py-3 bg-gradient-to-r from-pink-100 to-purple-100 text-pink-700 rounded-lg hover:shadow-md transition flex items-center gap-2 font-semibold">
                   <Upload className="w-4 h-4" />
-                  {form.photo ? 'Change Photo' : 'Choose Photo'}
+                  {form.photo ? t.form.changePhoto : t.form.choosePhoto}
                   <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
                 </label>
               </div>
@@ -191,7 +260,7 @@ export default function CreatePage({ params }: PageProps) {
                 onClick={() => toggleSection('personal')}
                 className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-pink-50 to-purple-50 hover:from-pink-100 hover:to-purple-100 transition"
               >
-                <h3 className="text-lg font-bold text-pink-700">Personal Details</h3>
+                <h3 className="text-lg font-bold text-pink-700">{t.form.personalDetails}</h3>
                 {expandedSections.personal ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
               </button>
               
@@ -199,38 +268,38 @@ export default function CreatePage({ params }: PageProps) {
                 <div className="p-6 space-y-4">
                   <input
                     type="text"
-                    placeholder="Full Name *"
+                    placeholder={t.form.name + " *"}
                     value={form.name}
                     onChange={e => updateForm('name', e.target.value)}
                     className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                   />
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input
                       type="text"
-                      placeholder="Date of Birth (DD/MM/YYYY)"
+                      placeholder={t.form.dob + " (DD/MM/YYYY)"}
                       value={form.dateOfBirth}
                       onChange={e => updateForm('dateOfBirth', e.target.value)}
                       className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                     />
                     <input
                       type="text"
-                      placeholder="Place of Birth"
+                      placeholder={t.form.placeOfBirth}
                       value={form.placeOfBirth}
                       onChange={e => updateForm('placeOfBirth', e.target.value)}
                       className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input
                       type="text"
-                      placeholder="Height (e.g., 5 feet 10 inches)"
+                      placeholder={t.form.height}
                       value={form.height}
                       onChange={e => updateForm('height', e.target.value)}
                       className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                     />
                     <input
                       type="text"
-                      placeholder="Caste"
+                      placeholder={t.form.caste}
                       value={form.caste}
                       onChange={e => updateForm('caste', e.target.value)}
                       className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
@@ -238,35 +307,35 @@ export default function CreatePage({ params }: PageProps) {
                   </div>
                   <input
                     type="text"
-                    placeholder="Gotra"
+                    placeholder={t.form.gotra}
                     value={form.gotra}
                     onChange={e => updateForm('gotra', e.target.value)}
                     className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                   />
                   <input
                     type="text"
-                    placeholder="Education (e.g., B.Tech in Computer Science)"
+                    placeholder={t.form.education}
                     value={form.education}
                     onChange={e => updateForm('education', e.target.value)}
                     className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                   />
                   <input
                     type="text"
-                    placeholder="Occupation"
+                    placeholder={t.form.occupation}
                     value={form.occupation}
                     onChange={e => updateForm('occupation', e.target.value)}
                     className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                   />
                   <input
                     type="text"
-                    placeholder="Languages (e.g., Hindi, English, Marathi)"
+                    placeholder={t.form.languages}
                     value={form.languages}
                     onChange={e => updateForm('languages', e.target.value)}
                     className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                   />
                   <input
                     type="text"
-                    placeholder="Hobbies"
+                    placeholder={t.form.hobbies}
                     value={form.hobbies}
                     onChange={e => updateForm('hobbies', e.target.value)}
                     className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
@@ -281,39 +350,39 @@ export default function CreatePage({ params }: PageProps) {
                 onClick={() => toggleSection('family')}
                 className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-pink-50 to-purple-50 hover:from-pink-100 hover:to-purple-100 transition"
               >
-                <h3 className="text-lg font-bold text-pink-700">Family Details</h3>
+                <h3 className="text-lg font-bold text-pink-700">{t.form.familyDetails}</h3>
                 {expandedSections.family ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
               </button>
               
               {expandedSections.family && (
                 <div className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input
                       type="text"
-                      placeholder="Father's Name"
+                      placeholder={t.form.fatherName}
                       value={form.fatherName}
                       onChange={e => updateForm('fatherName', e.target.value)}
                       className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                     />
                     <input
                       type="text"
-                      placeholder="Father's Occupation"
+                      placeholder={t.form.fatherOccupation}
                       value={form.fatherOccupation}
                       onChange={e => updateForm('fatherOccupation', e.target.value)}
                       className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input
                       type="text"
-                      placeholder="Mother's Name"
+                      placeholder={t.form.motherName}
                       value={form.motherName}
                       onChange={e => updateForm('motherName', e.target.value)}
                       className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                     />
                     <input
                       type="text"
-                      placeholder="Mother's Occupation"
+                      placeholder={t.form.motherOccupation}
                       value={form.motherOccupation}
                       onChange={e => updateForm('motherOccupation', e.target.value)}
                       className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
@@ -326,70 +395,70 @@ export default function CreatePage({ params }: PageProps) {
                       onClick={() => toggleSection('optional')}
                       className="text-sm text-pink-600 hover:text-pink-700 font-semibold flex items-center gap-1"
                     >
-                      {expandedSections.optional ? '- Hide' : '+ Add'} more family members (optional)
+                      {expandedSections.optional ? t.form.hideMember : t.form.addMember} {t.form.optional}
                     </button>
                     
                     {expandedSections.optional && (
                       <div className="space-y-4 mt-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <input
                             type="text"
-                            placeholder="Grandfather's Name"
+                            placeholder={t.form.grandfatherName}
                             value={form.grandfatherName}
                             onChange={e => updateForm('grandfatherName', e.target.value)}
                             className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                           />
                           <input
                             type="text"
-                            placeholder="Grandfather's Occupation"
+                            placeholder={t.form.grandfatherOccupation}
                             value={form.grandfatherOccupation}
                             onChange={e => updateForm('grandfatherOccupation', e.target.value)}
                             className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                           />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <input
                             type="text"
-                            placeholder="Uncle's Name"
+                            placeholder={t.form.uncleName}
                             value={form.uncleName}
                             onChange={e => updateForm('uncleName', e.target.value)}
                             className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                           />
                           <input
                             type="text"
-                            placeholder="Uncle's Occupation"
+                            placeholder={t.form.uncleOccupation}
                             value={form.uncleOccupation}
                             onChange={e => updateForm('uncleOccupation', e.target.value)}
                             className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                           />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <input
                             type="text"
-                            placeholder="Elder Brother's Name"
+                            placeholder={t.form.elderBrotherName}
                             value={form.elderBrotherName}
                             onChange={e => updateForm('elderBrotherName', e.target.value)}
                             className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                           />
                           <input
                             type="text"
-                            placeholder="Elder Brother's Occupation"
+                            placeholder={t.form.elderBrotherOccupation}
                             value={form.elderBrotherOccupation}
                             onChange={e => updateForm('elderBrotherOccupation', e.target.value)}
                             className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                           />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <input
                             type="text"
-                            placeholder="Younger Brother's Name"
+                            placeholder={t.form.youngerBrotherName}
                             value={form.youngerBrotherName}
                             onChange={e => updateForm('youngerBrotherName', e.target.value)}
                             className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                           />
                           <input
                             type="text"
-                            placeholder="Younger Brother's Occupation"
+                            placeholder={t.form.youngerBrotherOccupation}
                             value={form.youngerBrotherOccupation}
                             onChange={e => updateForm('youngerBrotherOccupation', e.target.value)}
                             className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
@@ -408,7 +477,7 @@ export default function CreatePage({ params }: PageProps) {
                 onClick={() => toggleSection('contact')}
                 className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-pink-50 to-purple-50 hover:from-pink-100 hover:to-purple-100 transition"
               >
-                <h3 className="text-lg font-bold text-pink-700">Contact Details</h3>
+                <h3 className="text-lg font-bold text-pink-700">{t.form.contactDetails}</h3>
                 {expandedSections.contact ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
               </button>
               
@@ -416,21 +485,21 @@ export default function CreatePage({ params }: PageProps) {
                 <div className="p-6 space-y-4">
                   <input
                     type="text"
-                    placeholder="Contact Person Name"
+                    placeholder={t.form.contactPerson}
                     value={form.contactPerson}
                     onChange={e => updateForm('contactPerson', e.target.value)}
                     className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                   />
                   <input
                     type="text"
-                    placeholder="Contact Number"
+                    placeholder={t.form.contactNumber}
                     value={form.contactNumber}
                     onChange={e => updateForm('contactNumber', e.target.value)}
                     className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                   />
                   <input
                     type="email"
-                    placeholder="Email Address"
+                    placeholder={t.form.email}
                     value={form.email}
                     onChange={e => updateForm('email', e.target.value)}
                     className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
@@ -441,22 +510,24 @@ export default function CreatePage({ params }: PageProps) {
           </div>
 
           {/* Right - Live Preview (2 columns) */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 order-1 lg:order-2">
             <div className="sticky top-24">
               <div className="bg-white rounded-xl shadow-xl p-4">
                 <div className="bg-gray-50 rounded-lg p-2 border-2 border-gray-200">
                   <div className="overflow-auto" style={{ maxHeight: '700px' }}>
+                    {/* Scale transform for preview */}
                     <div style={{ 
                       transform: 'scale(0.4)', 
                       transformOrigin: 'top left',
-                      width: '250%'
+                      width: '250%' // Compensate for scale(0.4) -> 1/0.4 = 2.5
                     }}>
-                      <ClassicEleganceTemplate data={form} />
+                      <GenericTemplate data={form} config={template.config} />
                     </div>
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 text-center mt-3">
+                <p className="text-xs text-gray-500 text-center mt-3 flex items-center justify-center gap-1">
                   ✨ Live Preview - Changes appear instantly
+                  {!template.free && !isPaid && <Lock className="w-3 h-3 ml-1" />}
                 </p>
               </div>
             </div>
@@ -466,7 +537,7 @@ export default function CreatePage({ params }: PageProps) {
 
       {/* Hidden template for PDF generation */}
       <div style={{ position: 'fixed', left: '-9999px', top: 0 }}>
-        <ClassicEleganceTemplate data={form} />
+        <GenericTemplate data={form} config={template.config} id="biodata-template" />
       </div>
     </div>
   );
