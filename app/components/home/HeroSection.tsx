@@ -27,13 +27,11 @@ export default function HeroSection({ onStart }: Props) {
       </p>
 
       <button
-          onClick={() => router.push('/templates')}
-        className="px-8 py-4 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-lg text-lg font-semibold cursor-pointer hover:shadow-2xl transition-all transform hover:scale-105"
+        onClick={onStart}
+        className="px-8 py-4 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-lg text-lg font-semibold cursor-pointer hover:shadow-2xl transition-all transform hover:scale-105 flex items-center gap-2 mx-auto"
       >
-        <div className="flex items-center gap-2">
-          <Zap className="w-5 h-5" />
-          Start Creating Free
-        </div>
+        <Zap className="w-5 h-5" />
+        Start Creating Free
       </button>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-2xl mx-auto mt-12 text-sm">
