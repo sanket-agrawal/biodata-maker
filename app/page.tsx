@@ -1,10 +1,16 @@
 'use client';
 
-import { useState } from 'react';
 import HeroSection from './components/home/HeroSection';
-import FeatureSection from './components/home/FeatureSection';
 import TemplateSection from './components/home/TemplateSection';
-import CTASection from './components/home/CTASection';
+import WhatItDoes from './components/content/WhatItDoes';
+import TargetAudience from './components/content/TargetAudience';
+import CommunityTemplates from './components/content/CommunityTemplates';
+import BiodataFormat from './components/content/BiodataFormat';
+import WhyChooseUs from './components/content/WhyChooseUs';
+import Tips from './components/content/Tips';
+import FAQ from './components/content/FAQ';
+import Testimonials from './components/content/Testimonials';
+import FinalCTA from './components/content/FinalCTA';
 
 export default function Home() {
   const scrollToTemplates = () => {
@@ -15,18 +21,18 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-purple-50">
-      {/* Hero Section */}
-       <HeroSection onStart={scrollToTemplates}/>
-
-      {/* Features */}
-       <FeatureSection/>
-
-      {/* Templates List */}
+    <div className="min-h-screen bg-white font-sans">
+      <HeroSection onStart={scrollToTemplates}/>
       <TemplateSection />
-
-      {/* CTA */}
-       <CTASection onStart={scrollToTemplates} />
+      <WhatItDoes />
+      <TargetAudience />
+      <CommunityTemplates />
+      <BiodataFormat />
+      <WhyChooseUs />
+      <Tips />
+      <FAQ />
+      <Testimonials />
+      <FinalCTA />
     </div>
   );
 }

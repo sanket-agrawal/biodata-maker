@@ -21,19 +21,19 @@ export default function TemplateSection() {
   return (
     <section id="templates" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24 bg-gray-50">
       <div className="text-center mb-12">
-        <h2 className="text-3xl lg:text-4xl font-bold mb-4 text-gray-900">
-          Choose Your Perfect Template
+        <h2 className="text-3xl lg:text-4xl font-bold mb-4 text-[#1a202c]">
+          Featured Marriage Biodata Templates
         </h2>
         <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-          Select from our collection of {templates.length} beautiful templates. 
-          Both free and premium options available.
+          Beautiful, professional templates ready to download in PDF, Word & Image
         </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
         {templates.map((template) => (
-          <Link href={`/create/${template.id}`} key={template.id} className="group">
-            <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col h-full">
+          <div key={template.id} className="group flex flex-col items-center">
+             <Link href={`/create/${template.id}`} className="w-full">
+            <div className="bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col h-full relative">
               {/* Preview Container */}
               <div className="relative aspect-[1/1.414] bg-gray-100 overflow-hidden group-hover:scale-105 transition-transform duration-500">
                 {!template.free && (
@@ -42,7 +42,7 @@ export default function TemplateSection() {
                   </div>
                 )}
                 
-                {/* Scaled Preview - Centered and Scaled */}
+                {/* Scaled Preview */}
                 <div className="absolute inset-0 flex items-start justify-center pt-0 overflow-hidden pointer-events-none select-none">
                   <div className="origin-top transform scale-[0.4] sm:scale-[0.35] w-[794px] h-[1123px] bg-white shadow-sm">
                      <GenericTemplate data={dummyData} config={template.config} />
@@ -56,20 +56,22 @@ export default function TemplateSection() {
                   </span>
                 </div>
               </div>
-
-              {/* Footer */}
-              <div className="p-4 border-t flex items-center justify-between mt-auto bg-white z-10 relative">
-                <div>
-                  <h3 className="font-semibold text-gray-900 truncate pr-2" title={template.name}>
-                    {template.name}
-                  </h3>
-                  <p className="text-xs text-gray-500 capitalize">{template.config.layout} Style</p>
-                </div>
-                {/* Price removed as requested */}
-              </div>
             </div>
-          </Link>
+             </Link>
+             <h3 className="mt-4 font-medium text-gray-900 text-center">
+                {template.name}
+             </h3>
+          </div>
         ))}
+      </div>
+      
+       <div className="mt-12 text-center">
+        <Link 
+            href="/templates" 
+            className="inline-block px-8 py-3 bg-[#C05621] text-white font-semibold rounded-lg hover:bg-[#9C4215] transition-colors"
+        >
+            View All Templates →
+        </Link>
       </div>
     </section>
   );

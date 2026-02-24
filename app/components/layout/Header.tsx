@@ -1,77 +1,120 @@
 "use client";
 
-import { Sparkles, Globe, ChevronDown } from "lucide-react";
 import Link from 'next/link';
-import { useLanguage } from '@/app/context/LanguageContext';
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
+import { Menu, X } from 'lucide-react';
 
 export default function Header() {
-  const { language, setLanguage, t } = useLanguage();
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  const languages = [
-    { code: 'en', name: 'English', native: 'English' },
-    { code: 'hi', name: 'Hindi', native: 'हिन्दी' },
-    { code: 'mr', name: 'Marathi', native: 'मराठी' },
-    { code: 'kn', name: 'Kannada', native: 'ಕನ್ನಡ' },
-  ] as const;
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <header className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Link href="/" className="flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-pink-600" />
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
-              BiodataPlus
-            </h1>
-          </Link>
-        </div>
+    <header className="bg-white shadow-sm sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          {/* Logo */}
+          <div className="flex-shrink-0 flex items-center">
+            <Link href="/" className="text-2xl font-bold text-[#8B4513]">
+              Biodata Maker
+            </Link>
+          </div>
 
-        <div className="relative" ref={dropdownRef}>
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition text-gray-700 font-medium text-sm md:text-base"
-          >
-            <Globe className="w-4 h-4" />
-            <span className="hidden sm:inline">{languages.find(l => l.code === language)?.native}</span>
-            <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-          </button>
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex space-x-8 items-center">
+            <Link href="/" className="text-gray-700 hover:text-[#8B4513] px-1 py-2 text-sm font-medium transition-colors">
+              Home
+            </Link>
+            <Link href="/templates" className="text-gray-700 hover:text-[#8B4513] px-1 py-2 text-sm font-medium transition-colors">
+              Templates
+            </Link>
+            <Link href="/marathi-biodata" className="text-gray-700 hover:text-[#8B4513] px-1 py-2 text-sm font-medium transition-colors">
+              Marathi Biodata
+            </Link>
+            <Link href="/english-biodata" className="text-gray-700 hover:text-[#8B4513] px-1 py-2 text-sm font-medium transition-colors">
+              English Biodata
+            </Link>
+            <Link href="/muslim-biodata" className="text-gray-700 hover:text-[#8B4513] px-1 py-2 text-sm font-medium transition-colors">
+              Muslim Biodata
+            </Link>
+          </nav>
 
-          {isOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 py-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-              {languages.map((lang) => (
-                <button
-                  key={lang.code}
-                  onClick={() => {
-                    setLanguage(lang.code);
-                    setIsOpen(false);
-                  }}
-                  className={`w-full px-4 py-2 text-left text-sm hover:bg-pink-50 transition flex items-center justify-between
-                    ${language === lang.code ? 'text-pink-600 bg-pink-50 font-semibold' : 'text-gray-700'}
-                  `}
-                >
-                  <span>{lang.native}</span>
-                  {language === lang.code && <span className="w-1.5 h-1.5 rounded-full bg-pink-600" />}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Right side button */}
+          <div className="hidden md:flex items-center">
+            <Link 
+              href="/create" 
+              className="bg-[#C05621] hover:bg-[#9C4215] text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200"
+            >
+              Create Biodata
+            </Link>
+          </div>
+
+          {/* Mobile menu button */}
+          <div className="md:hidden flex items-center">
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-[#8B4513] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#8B4513]"
+            >
+              <span className="sr-only">Open main menu</span>
+              {isMenuOpen ? (
+                <X className="block h-6 w-6" aria-hidden="true" />
+              ) : (
+                <Menu className="block h-6 w-6" aria-hidden="true" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Mobile Menu */}
+      {isMenuOpen && (
+        <div className="md:hidden bg-white border-t border-gray-100">
+          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+            <Link 
+              href="/" 
+              className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-[#8B4513] hover:bg-gray-50 transition-colors"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Home
+            </Link>
+            <Link 
+              href="/templates" 
+              className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-[#8B4513] hover:bg-gray-50 transition-colors"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Templates
+            </Link>
+            <Link 
+              href="/marathi-biodata" 
+              className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-[#8B4513] hover:bg-gray-50 transition-colors"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Marathi Biodata
+            </Link>
+            <Link 
+              href="/english-biodata" 
+              className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-[#8B4513] hover:bg-gray-50 transition-colors"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              English Biodata
+            </Link>
+            <Link 
+              href="/muslim-biodata" 
+              className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-[#8B4513] hover:bg-gray-50 transition-colors"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Muslim Biodata
+            </Link>
+            <div className="pt-4 pb-2 px-3">
+              <Link 
+                href="/create" 
+                className="block w-full text-center bg-[#C05621] hover:bg-[#9C4215] text-white px-4 py-2 rounded-md text-base font-medium transition-colors duration-200"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Create Biodata
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
