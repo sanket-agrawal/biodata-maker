@@ -36,12 +36,6 @@ export default function TemplateSection() {
             <div className="bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col h-full relative">
               {/* Preview Container */}
               <div className="relative aspect-[1/1.414] bg-gray-100 overflow-hidden group-hover:scale-105 transition-transform duration-500">
-                {!template.free && (
-                  <div className="absolute top-3 right-3 z-10 px-3 py-1 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-xs font-bold rounded-full shadow-lg">
-                    Premium
-                  </div>
-                )}
-                
                 {/* Scaled Preview */}
                 <div className="absolute inset-0 flex items-start justify-center pt-0 overflow-hidden pointer-events-none select-none">
                   <div className="origin-top transform scale-[0.4] sm:scale-[0.35] w-[794px] h-[1123px] bg-white shadow-sm">
