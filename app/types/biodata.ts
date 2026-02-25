@@ -26,18 +26,12 @@ export type BiodataForm = {
   hobbies: string;
   
   // Family Details
-  grandfatherName: string;
-  grandfatherOccupation: string;
   fatherName: string;
   fatherOccupation: string;
   motherName: string;
   motherOccupation: string;
-  uncleName: string;
-  uncleOccupation: string;
-  elderBrotherName: string;
-  elderBrotherOccupation: string;
-  youngerBrotherName: string;
-  youngerBrotherOccupation: string;
+  brothers: string;
+  sisters: string;
   
   // Contact Details
   contactPerson: string;
@@ -76,18 +70,12 @@ export const defaultBiodataForm: BiodataForm = {
   salary: '',
   languages: '',
   hobbies: '',
-  grandfatherName: '',
-  grandfatherOccupation: '',
   fatherName: '',
   fatherOccupation: '',
   motherName: '',
   motherOccupation: '',
-  uncleName: '',
-  uncleOccupation: '',
-  elderBrotherName: '',
-  elderBrotherOccupation: '',
-  youngerBrotherName: '',
-  youngerBrotherOccupation: '',
+  brothers: '',
+  sisters: '',
   contactPerson: '',
   contactNumber: '',
   email: '',
@@ -118,18 +106,12 @@ export const defaultFieldVisibility: FieldVisibility = {
   salary: true,
   languages: true,
   hobbies: true,
-  grandfatherName: true,
-  grandfatherOccupation: true,
   fatherName: true,
   fatherOccupation: true,
   motherName: true,
   motherOccupation: true,
-  uncleName: true,
-  uncleOccupation: true,
-  elderBrotherName: true,
-  elderBrotherOccupation: true,
-  youngerBrotherName: true,
-  youngerBrotherOccupation: true,
+  brothers: true,
+  sisters: true,
   contactPerson: true,
   contactNumber: true,
   email: true,

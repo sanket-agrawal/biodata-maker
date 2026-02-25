@@ -277,14 +277,8 @@ export default function GenericTemplate({ data, config, id, visibility = default
                 {renderField(t.form.fatherOccupation, data.fatherOccupation, 'fatherOccupation')}
                 {renderField(t.form.motherName, data.motherName, 'motherName')}
                 {renderField(t.form.motherOccupation, data.motherOccupation, 'motherOccupation')}
-                {renderField(t.form.grandfatherName, data.grandfatherName, 'grandfatherName')}
-                {renderField(t.form.grandfatherOccupation, data.grandfatherOccupation, 'grandfatherOccupation')}
-                {renderField(t.form.uncleName, data.uncleName, 'uncleName')}
-                {renderField(t.form.uncleOccupation, data.uncleOccupation, 'uncleOccupation')}
-                {renderField(t.form.elderBrotherName, data.elderBrotherName, 'elderBrotherName')}
-                {renderField(t.form.elderBrotherOccupation, data.elderBrotherOccupation, 'elderBrotherOccupation')}
-                {renderField(t.form.youngerBrotherName, data.youngerBrotherName, 'youngerBrotherName')}
-                {renderField(t.form.youngerBrotherOccupation, data.youngerBrotherOccupation, 'youngerBrotherOccupation')}
+                {renderField('Brothers', data.brothers, 'brothers')}
+                {renderField('Sisters', data.sisters, 'sisters')}
               </>
             ))}
 

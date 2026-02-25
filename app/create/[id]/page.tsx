@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState, useEffect } from 'react';
+import { use, useState, useEffect, useCallback } from 'react';
 import { templates } from '@/app/data/templates';
 import { BiodataForm, defaultBiodataForm, defaultFieldVisibility, FieldVisibility } from '@/app/types/biodata';
 import GenericTemplate from '@/app/components/templates/GenericTemplate';
@@ -8,6 +8,8 @@ import { Download, Upload, FileText, Image as ImageIcon, Loader2, ChevronDown, C
 import { generatePDF, generateImage } from '@/app/utils/pdfGenerator';
 import Script from 'next/script';
 import { useLanguage } from '@/app/context/LanguageContext';
+import Cropper from 'react-easy-crop';
+import getCroppedImg from '@/app/utils/cropImage';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -28,13 +30,22 @@ export default function CreatePage({ params }: PageProps) {
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [activeStep, setActiveStep] = useState(1);
   const [isPaid, setIsPaid] = useState(false);
-  const [showMobilePreview, setShowMobilePreview] = useState(false);
+  const [showMobilePreview, setShowMobilePreview] = useState(false); // Kept for backward compat but unused in new flow
   const { t, language, setLanguage } = useLanguage();
+
+  // Cropper state
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  const [tempImage, setTempImage] = useState<string | null>(null);
+  const [showCropper, setShowCropper] = useState(false);
 
   const steps = [
     { id: 1, label: t.form.basicInfo },
     { id: 2, label: t.form.family },
-    { id: 3, label: t.form.contact }
+    { id: 3, label: t.form.contact },
+    { id: 4, label: 'Preview & Download' }
   ];
 
   // If template is free, mark as paid automatically
@@ -57,9 +68,29 @@ export default function CreatePage({ params }: PageProps) {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        updateForm('photo', reader.result as string);
+        setTempImage(reader.result as string);
+        setShowCropper(true);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const onCropComplete = useCallback((croppedArea: any, croppedAreaPixels: any) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  const handleCropSave = async () => {
+    if (tempImage && croppedAreaPixels) {
+      try {
+        const croppedImage = await getCroppedImg(tempImage, croppedAreaPixels, rotation);
+        if (croppedImage) {
+          updateForm('photo', croppedImage);
+          setShowCropper(false);
+          setTempImage(null);
+        }
+      } catch (e) {
+        console.error(e);
+      }
     }
   };
 
@@ -205,13 +236,13 @@ export default function CreatePage({ params }: PageProps) {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-5 gap-8">
+      <div className="max-w-4xl mx-auto px-4 py-8">
           
-          {/* Left Form Section */}
-          <div className="lg:col-span-3 space-y-6">
+          {/* Main Form Section - Full Width now */}
+          <div className="space-y-6">
             
-            {/* Language & Header Info */}
+            {/* Language & Header Info - Only show on Step 1 */}
+            {activeStep === 1 && (
             <div className="bg-white rounded-xl shadow-sm border border-orange-100 p-4 md:p-6 space-y-6">
               <div>
                 <h3 className="text-sm font-semibold text-[#C05621] mb-3">{t.form.chooseLanguage}</h3>
@@ -268,6 +299,7 @@ export default function CreatePage({ params }: PageProps) {
                 </div>
               </div>
             </div>
+            )}
 
             {/* Step 1: Personal Details */}
             {activeStep === 1 && (
@@ -325,14 +357,8 @@ export default function CreatePage({ params }: PageProps) {
                   {renderField('fatherOccupation', t.form.fatherOccupation, "Father's Occupation")}
                   {renderField('motherName', t.form.motherName, "Mother's Full Name")}
                   {renderField('motherOccupation', t.form.motherOccupation, "Mother's Occupation")}
-                  {renderField('grandfatherName', t.form.grandfatherName, "Grandfather's Name")}
-                  {renderField('grandfatherOccupation', t.form.grandfatherOccupation, "Grandfather's Occupation")}
-                  {renderField('uncleName', t.form.uncleName, "Uncle's Name")}
-                  {renderField('uncleOccupation', t.form.uncleOccupation, "Uncle's Occupation")}
-                  {renderField('elderBrotherName', t.form.elderBrotherName, "Elder Brother's Name")}
-                  {renderField('elderBrotherOccupation', t.form.elderBrotherOccupation, "Occupation")}
-                  {renderField('youngerBrotherName', t.form.youngerBrotherName, "Younger Brother's Name")}
-                  {renderField('youngerBrotherOccupation', t.form.youngerBrotherOccupation, "Occupation")}
+                  {renderField('brothers', 'Brothers', "e.g., 1 Elder, Working in USA")}
+                  {renderField('sisters', 'Sisters', "e.g., 2, 1 Married")}
                 </div>
               </div>
             )}
@@ -352,25 +378,63 @@ export default function CreatePage({ params }: PageProps) {
                   {renderField('email', t.form.email, "Email Address")}
                   {renderField('address', 'Address', "Residential Address")}
                   
-                  <div className="bg-white p-4 rounded-lg border border-orange-100">
-                    <label className="font-semibold text-gray-700 block mb-2">{t.form.uploadPhoto}</label>
-                    <div className="flex items-center gap-4">
-                        {form.photo && (
-                        <img src={form.photo} alt="Preview" className="w-20 h-20 object-cover rounded-lg border border-gray-200" />
-                        )}
-                        <label className="cursor-pointer px-4 py-2 bg-orange-50 text-[#C05621] rounded-lg border border-orange-200 hover:bg-orange-100 transition flex items-center gap-2 text-sm font-medium">
-                        <Upload className="w-4 h-4" />
-                        {form.photo ? t.form.changePhoto : t.form.choosePhoto}
-                        <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
-                        </label>
-                    </div>
+                  {/* Photo Upload with Tips */}
+                  <div className="grid md:grid-cols-2 gap-6">
+                     <div className="bg-white p-6 rounded-lg border border-orange-100 text-center">
+                        <h4 className="font-semibold text-gray-700 mb-4">{t.form.choosePhoto}</h4>
+                         <div className="flex flex-col items-center gap-4">
+                            <div className="relative w-32 h-32 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center border border-gray-200">
+                              {form.photo ? (
+                                <img src={form.photo} alt="Preview" className="w-full h-full object-cover" />
+                              ) : (
+                                <ImageIcon className="w-8 h-8 text-gray-400" />
+                              )}
+                            </div>
+                            <label className="cursor-pointer px-6 py-2 bg-[#C05621] text-white rounded-lg hover:bg-[#9C4215] transition shadow-sm flex items-center gap-2 text-sm font-medium">
+                              <Upload className="w-4 h-4" />
+                              {t.form.uploadPhoto}
+                              <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
+                            </label>
+                            <p className="text-xs text-gray-500">Upload your profile photo, biodata with photos get more attention.</p>
+                        </div>
+                     </div>
+
+                     <div className="bg-orange-50 p-6 rounded-lg border border-orange-100">
+                        <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                           <span className="text-lg">📸</span> Photo Tips
+                        </h4>
+                        <ul className="text-xs space-y-2 text-gray-600 list-disc pl-4">
+                           <li>Use a clear, recent photo with good lighting</li>
+                           <li>Face should be clearly visible and centered</li>
+                           <li>Avoid group photos or heavily filtered images</li>
+                           <li>Professional or formal attire recommended</li>
+                           <li>Image will be cropped to 4:5 ratio automatically</li>
+                        </ul>
+                     </div>
                   </div>
                 </div>
               </div>
             )}
 
+            {/* Step 4: Preview */}
+            {activeStep === 4 && (
+              <div className="space-y-6">
+                 <div className="bg-orange-50/50 p-4 rounded-t-xl border-b border-orange-100 flex justify-between items-center">
+                  <h2 className="text-lg font-bold text-[#8B4513] flex items-center gap-2">
+                    Biodata Preview
+                  </h2>
+                </div>
+                
+                <div className="bg-gray-100 p-8 rounded-xl border border-gray-200 overflow-auto flex justify-center">
+                   <div style={{ transform: 'scale(0.6)', transformOrigin: 'top center', height: '700px', width: '794px' }}>
+                      <GenericTemplate data={form} config={template.config} />
+                   </div>
+                </div>
+              </div>
+            )}
+
             {/* Navigation Buttons */}
-            <div className="flex flex-col-reverse md:flex-row justify-between items-center pt-6 border-t border-gray-200 mt-8 gap-4">
+            <div className="flex flex-col-reverse md:flex-row justify-between items-center pt-6 border-t border-gray-200 mt-8 gap-4 pb-12">
                <button 
                   onClick={() => setForm(defaultBiodataForm)}
                   className="flex items-center gap-2 text-gray-500 hover:text-red-500 font-medium text-sm transition-colors"
@@ -389,7 +453,7 @@ export default function CreatePage({ params }: PageProps) {
                       </button>
                    )}
                    
-                   {activeStep < 3 ? (
+                   {activeStep < 4 ? (
                       <button 
                         onClick={() => setActiveStep(prev => prev + 1)}
                         className="flex-1 md:flex-none px-8 py-2.5 bg-[#C05621] text-white rounded-lg font-semibold hover:bg-[#9C4215] transition-colors shadow-sm flex items-center justify-center gap-2"
@@ -430,56 +494,54 @@ export default function CreatePage({ params }: PageProps) {
                 </div>
             </div>
           </div>
-
-          {/* Desktop Preview Section */}
-          <div className="hidden lg:block lg:col-span-2 order-1 lg:order-2">
-            <div className="sticky top-24">
-              <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-                <div className="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center">
-                   <span className="font-semibold text-gray-700">Live Preview</span>
-                   <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full">{template.name}</span>
-                </div>
-                <div className="p-4 bg-gray-100 overflow-hidden flex justify-center">
-                    <div style={{ transform: 'scale(0.45)', transformOrigin: 'top center', height: '500px' }}>
-                       <GenericTemplate data={form} config={template.config} />
-                    </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-        </div>
       </div>
 
-      {/* Mobile Floating Preview Button */}
-      <div className="lg:hidden fixed bottom-6 right-6 z-40">
-        <button
-          onClick={() => setShowMobilePreview(true)}
-          className="flex items-center gap-2 px-5 py-3 bg-[#8B4513] text-white rounded-full shadow-xl hover:bg-[#723810] transition-colors font-semibold"
-        >
-          <Eye className="w-5 h-5" />
-          Preview
-        </button>
-      </div>
-
-      {/* Mobile Preview Modal */}
-      {showMobilePreview && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b">
-              <h3 className="font-bold text-lg">Preview</h3>
-              <button 
-                onClick={() => setShowMobilePreview(false)}
-                className="p-2 hover:bg-gray-100 rounded-full"
-              >
-                <X className="w-6 h-6 text-gray-600" />
-              </button>
+       {/* Cropper Modal */}
+       {showCropper && tempImage && (
+        <div className="fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="font-bold text-lg">Crop Your Photo</h3>
+              <button onClick={() => setShowCropper(false)}><X className="w-5 h-5" /></button>
             </div>
-            
-            <div className="flex-1 overflow-auto bg-gray-100 p-4 flex justify-center">
-               {/* Smaller scale for mobile */}
-               <div style={{ transform: 'scale(0.35)', transformOrigin: 'top center', height: '400px', width: '794px' }}>
-                  <GenericTemplate data={form} config={template.config} />
+            <div className="relative h-80 bg-gray-900">
+               <Cropper
+                  image={tempImage}
+                  crop={crop}
+                  zoom={zoom}
+                  aspect={4 / 5}
+                  onCropChange={setCrop}
+                  onCropComplete={onCropComplete}
+                  onZoomChange={setZoom}
+               />
+            </div>
+            <div className="p-4 space-y-4">
+               <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase">Zoom</label>
+                  <input
+                    type="range"
+                    value={zoom}
+                    min={1}
+                    max={3}
+                    step={0.1}
+                    aria-labelledby="Zoom"
+                    onChange={(e) => setZoom(Number(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#C05621]"
+                  />
+               </div>
+               <div className="flex gap-3 justify-end pt-2">
+                  <button 
+                    onClick={() => setShowCropper(false)}
+                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleCropSave}
+                    className="px-6 py-2 bg-[#C05621] text-white rounded-lg font-medium hover:bg-[#9C4215]"
+                  >
+                    Apply
+                  </button>
                </div>
             </div>
           </div>
