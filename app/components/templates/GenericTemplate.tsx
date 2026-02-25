@@ -1,6 +1,6 @@
 "use client";
 
-import { BiodataForm } from '@/app/types/biodata';
+import { BiodataForm, FieldVisibility, defaultFieldVisibility } from '@/app/types/biodata';
 import { TemplateConfig } from '@/app/types/template';
 import { useLanguage } from '@/app/context/LanguageContext';
 
@@ -8,9 +8,10 @@ type Props = {
   data: BiodataForm;
   config: TemplateConfig;
   id?: string;
+  visibility?: FieldVisibility;
 };
 
-export default function GenericTemplate({ data, config, id }: Props) {
+export default function GenericTemplate({ data, config, id, visibility = defaultFieldVisibility }: Props) {
   const { layout, colors, fonts, borderStyle, headerStyle, sectionStyle } = config;
   const { t } = useLanguage();
 
@@ -51,7 +52,7 @@ export default function GenericTemplate({ data, config, id }: Props) {
     },
     underlined: { 
       textAlign: 'center', 
-      marginBottom: '30px',
+      marginBottom: '30px', 
       borderBottom: `2px solid ${colors.primary}`,
       paddingBottom: '15px'
     },
@@ -123,8 +124,10 @@ export default function GenericTemplate({ data, config, id }: Props) {
     borderBottom: layout === 'classic' ? `1px dashed ${colors.border}` : 'none'
   };
 
-  const renderField = (label: string, value: string) => {
+  const renderField = (label: string, value: string, key?: keyof BiodataForm) => {
     if (!value) return null;
+    if (key && visibility[key] === false) return null;
+
     return (
       <div style={rowStyle}>
         <span style={labelStyle}>{label}:</span>
@@ -146,6 +149,13 @@ export default function GenericTemplate({ data, config, id }: Props) {
     <div id={id} style={containerStyle}>
       <div style={{ ...borderStyles[borderStyle], minHeight: '100%', height: '100%' }}>
         
+        {/* God Name */}
+        {data.godName && visibility.godName !== false && (
+          <div style={{ textAlign: 'center', marginBottom: '15px', color: colors.primary, fontWeight: 'bold' }}>
+             {data.godName}
+          </div>
+        )}
+
         {/* Header */}
         <div style={headerStyles[headerStyle]}>
           <h1 style={{ 
@@ -156,7 +166,7 @@ export default function GenericTemplate({ data, config, id }: Props) {
             textTransform: 'uppercase',
             letterSpacing: '2px'
           }}>
-            {t.template.biodata}
+            {data.biodataTitle && visibility.biodataTitle !== false ? data.biodataTitle : t.template.biodata}
           </h1>
         </div>
 
@@ -172,59 +182,63 @@ export default function GenericTemplate({ data, config, id }: Props) {
             paddingRight: layout === 'modern-sidebar' ? '20px' : '0'
           }}>
             {/* Photo */}
-            <div style={{ 
-              width: layout === 'modern-sidebar' ? '100%' : '200px',
-              flexShrink: 0,
-              textAlign: 'center'
-             }}>
-              {data.photo ? (
-                <img 
-                  src={data.photo} 
-                  alt="Profile" 
-                  style={{
+            {visibility.photo !== false && (
+              <div style={{ 
+                width: layout === 'modern-sidebar' ? '100%' : '200px',
+                flexShrink: 0,
+                textAlign: 'center'
+              }}>
+                {data.photo ? (
+                  <img 
+                    src={data.photo} 
+                    alt="Profile" 
+                    style={{
+                      width: '180px',
+                      height: '220px',
+                      objectFit: 'cover',
+                      border: `4px solid ${colors.primary}`,
+                      borderRadius: borderStyle === 'none' ? '50%' : '4px',
+                      margin: '0 auto'
+                    }}
+                  />
+                ) : (
+                  <div style={{
                     width: '180px',
                     height: '220px',
-                    objectFit: 'cover',
+                    backgroundColor: colors.secondary,
                     border: `4px solid ${colors.primary}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: colors.primary,
+                    margin: '0 auto',
                     borderRadius: borderStyle === 'none' ? '50%' : '4px',
-                    margin: '0 auto'
-                  }}
-                />
-              ) : (
-                <div style={{
-                  width: '180px',
-                  height: '220px',
-                  backgroundColor: colors.secondary,
-                  border: `4px solid ${colors.primary}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: colors.primary,
-                  margin: '0 auto',
-                  borderRadius: borderStyle === 'none' ? '50%' : '4px',
-                }}>
-                  Photo
-                </div>
-              )}
-            </div>
+                  }}>
+                    Photo
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Basic Info (Name) */}
             <div style={{ flexGrow: 1, paddingTop: '10px' }}>
-              <h2 style={{ 
-                fontSize: '28px', 
-                fontWeight: 'bold', 
-                fontFamily: fonts.heading,
-                color: colors.primary,
-                marginBottom: '10px',
-                textAlign: layout === 'modern-sidebar' ? 'center' : 'left'
-              }}>
-                {data.name || 'Your Name'}
-              </h2>
+              {visibility.name !== false && (
+                <h2 style={{ 
+                  fontSize: '28px', 
+                  fontWeight: 'bold', 
+                  fontFamily: fonts.heading,
+                  color: colors.primary,
+                  marginBottom: '10px',
+                  textAlign: layout === 'modern-sidebar' ? 'center' : 'left'
+                }}>
+                  {data.name || 'Your Name'}
+                </h2>
+              )}
               {layout !== 'modern-sidebar' && (
                  <div style={{ fontSize: '16px' }}>
-                    {renderField(t.form.dob, data.dateOfBirth)}
-                    {renderField(t.form.timeOfBirth, '10:30 AM')} 
-                    {renderField(t.form.placeOfBirth, data.placeOfBirth)}
+                    {renderField(t.form.dob, data.dateOfBirth, 'dateOfBirth')}
+                    {renderField(t.form.timeOfBirth, data.timeOfBirth, 'timeOfBirth')} 
+                    {renderField(t.form.placeOfBirth, data.placeOfBirth, 'placeOfBirth')}
                  </div>
               )}
             </div>
@@ -234,40 +248,46 @@ export default function GenericTemplate({ data, config, id }: Props) {
           <div style={{ flexGrow: 1 }}>
             {renderSection(t.template.personalDetails, (
               <>
-                 {layout === 'modern-sidebar' && renderField(t.form.dob, data.dateOfBirth)}
-                 {layout === 'modern-sidebar' && renderField(t.form.placeOfBirth, data.placeOfBirth)}
-                 {renderField(t.form.height, data.height)}
-                 {renderField(t.form.caste, data.caste)}
-                 {renderField(t.form.gotra, data.gotra)}
-                 {renderField(t.form.education, data.education)}
-                 {renderField(t.form.occupation, data.occupation)}
-                 {renderField(t.form.languages, data.languages)}
-                 {renderField(t.form.hobbies, data.hobbies)}
+                 {layout === 'modern-sidebar' && renderField(t.form.dob, data.dateOfBirth, 'dateOfBirth')}
+                 {layout === 'modern-sidebar' && renderField(t.form.timeOfBirth, data.timeOfBirth, 'timeOfBirth')}
+                 {layout === 'modern-sidebar' && renderField(t.form.placeOfBirth, data.placeOfBirth, 'placeOfBirth')}
+                 
+                 {renderField(t.form.height, data.height, 'height')}
+                 {renderField(t.form.religious, data.religious, 'religious')}
+                 {renderField(t.form.caste, data.caste, 'caste')}
+                 {renderField('Sub Caste', data.subCaste, 'subCaste')}
+                 {renderField(t.form.gotra, data.gotra, 'gotra')}
+                 {renderField(t.form.rashi, data.rashi, 'rashi')}
+                 {renderField(t.form.nakshatra, data.nakshatra, 'nakshatra')}
+                 {renderField(t.form.manglik, data.manglik, 'manglik')}
+                 {renderField(t.form.gan, data.gan, 'gan')}
+                 {renderField(t.form.complexion, data.complexion, 'complexion')}
+                 {renderField(t.form.bloodGroup, data.bloodGroup, 'bloodGroup')}
+                 {renderField(t.form.education, data.education, 'education')}
+                 {renderField(t.form.occupation, data.occupation, 'occupation')}
+                 {renderField(t.form.salary, data.salary, 'salary')}
+                 {renderField(t.form.languages, data.languages, 'languages')}
+                 {renderField(t.form.hobbies, data.hobbies, 'hobbies')}
               </>
             ))}
 
             {renderSection(t.template.familyDetails, (
               <>
-                {renderField(t.form.grandfatherName, data.grandfatherName)}
-                {renderField(t.form.grandfatherOccupation, data.grandfatherOccupation)}
-                {renderField(t.form.fatherName, data.fatherName)}
-                {renderField(t.form.fatherOccupation, data.fatherOccupation)}
-                {renderField(t.form.motherName, data.motherName)}
-                {renderField(t.form.motherOccupation, data.motherOccupation)}
-                {renderField(t.form.uncleName, data.uncleName)}
-                {renderField(t.form.uncleOccupation, data.uncleOccupation)}
-                {renderField(t.form.elderBrotherName, data.elderBrotherName)}
-                {renderField(t.form.elderBrotherOccupation, data.elderBrotherOccupation)}
-                {renderField(t.form.youngerBrotherName, data.youngerBrotherName)}
-                {renderField(t.form.youngerBrotherOccupation, data.youngerBrotherOccupation)}
+                {renderField(t.form.fatherName, data.fatherName, 'fatherName')}
+                {renderField(t.form.fatherOccupation, data.fatherOccupation, 'fatherOccupation')}
+                {renderField(t.form.motherName, data.motherName, 'motherName')}
+                {renderField(t.form.motherOccupation, data.motherOccupation, 'motherOccupation')}
+                {renderField('Brothers', data.brothers, 'brothers')}
+                {renderField('Sisters', data.sisters, 'sisters')}
               </>
             ))}
 
             {renderSection(t.template.contactDetails, (
               <>
-                {renderField(t.form.contactPerson, data.contactPerson)}
-                {renderField(t.form.contactNumber, data.contactNumber)}
-                {renderField(t.form.email, data.email)}
+                {renderField(t.form.contactPerson, data.contactPerson, 'contactPerson')}
+                {renderField(t.form.contactNumber, data.contactNumber, 'contactNumber')}
+                {renderField(t.form.email, data.email, 'email')}
+                {renderField('Address', data.address, 'address')}
               </>
             ))}
           </div>

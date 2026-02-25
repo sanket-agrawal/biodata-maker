@@ -8,8 +8,16 @@ import { LanguageProvider } from "./context/LanguageContext";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "BiodataMaker - Create Beautiful Marriage Biodata in Minutes",
-  description: "Create professional marriage biodata with stunning templates. Download in PDF, PNG, or JPG. Free templates available. No signup required.",
+  title: "Free Marriage Biodata Maker | Create Bio Data for Marriage Online",
+  description: "Create bio data for marriage online for free. Use Biodata Maker to make biodata for marriage and download in PDF, Word or Image format in minutes. No registration needed.",
+  keywords: "marriage biodata maker, biodata for marriage, create biodata online, free biodata maker, marriage biodata format, biodata templates",
+  openGraph: {
+    title: "Free Marriage Biodata Maker | Create Bio Data for Marriage Online",
+    description: "Create bio data for marriage online for free. Download in PDF, Word or Image format in minutes.",
+    type: "website",
+    locale: "en_IN",
+    siteName: "Biodata Maker"
+  }
 };
 
 export default function RootLayout({

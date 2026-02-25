@@ -1,13 +1,15 @@
 'use client';
 
-import { use, useState, useEffect } from 'react';
+import { use, useState, useEffect, useCallback } from 'react';
 import { templates } from '@/app/data/templates';
-import { BiodataForm, defaultBiodataForm } from '@/app/types/biodata';
+import { BiodataForm, defaultBiodataForm, defaultFieldVisibility, FieldVisibility } from '@/app/types/biodata';
 import GenericTemplate from '@/app/components/templates/GenericTemplate';
-import { Download, Upload, FileText, Image as ImageIcon, Loader2, ChevronDown, ChevronUp, Lock } from 'lucide-react';
+import { Download, Upload, FileText, Image as ImageIcon, Loader2, ChevronDown, ChevronUp, Lock, Edit2, RotateCcw, Eye, X } from 'lucide-react';
 import { generatePDF, generateImage } from '@/app/utils/pdfGenerator';
 import Script from 'next/script';
 import { useLanguage } from '@/app/context/LanguageContext';
+import Cropper from 'react-easy-crop';
+import getCroppedImg from '@/app/utils/cropImage';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -23,21 +25,33 @@ export default function CreatePage({ params }: PageProps) {
   const { id } = use(params);
   const template = templates.find(t => t.id === Number(id));
   const [form, setForm] = useState<BiodataForm>(defaultBiodataForm);
+  const [fieldVisibility, setFieldVisibility] = useState<FieldVisibility>(defaultFieldVisibility);
   const [isDownloading, setIsDownloading] = useState(false);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
-  const [expandedSections, setExpandedSections] = useState({
-    personal: true,
-    family: true,
-    contact: true,
-    optional: false
-  });
+  const [activeStep, setActiveStep] = useState(1);
   const [isPaid, setIsPaid] = useState(false);
-  const { t } = useLanguage();
+  const [showMobilePreview, setShowMobilePreview] = useState(false); // Kept for backward compat but unused in new flow
+  const { t, language, setLanguage } = useLanguage();
+
+  // Cropper state
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+  const [tempImage, setTempImage] = useState<string | null>(null);
+  const [showCropper, setShowCropper] = useState(false);
+
+  const steps = [
+    { id: 1, label: t.form.basicInfo },
+    { id: 2, label: t.form.family },
+    { id: 3, label: t.form.contact },
+    { id: 4, label: 'Preview & Download' }
+  ];
 
   // If template is free, mark as paid automatically
   useEffect(() => {
     if (template?.free) {
-      setIsPaid(true);
+      setIsPaid(true); 
     }
   }, [template]);
 
@@ -45,8 +59,8 @@ export default function CreatePage({ params }: PageProps) {
     setForm(prev => ({ ...prev, [field]: value }));
   };
 
-  const toggleSection = (section: keyof typeof expandedSections) => {
-    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  const toggleVisibility = (field: keyof BiodataForm) => {
+    setFieldVisibility(prev => ({ ...prev, [field]: !prev[field] }));
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -54,9 +68,29 @@ export default function CreatePage({ params }: PageProps) {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        updateForm('photo', reader.result as string);
+        setTempImage(reader.result as string);
+        setShowCropper(true);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const onCropComplete = useCallback((croppedArea: any, croppedAreaPixels: any) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  const handleCropSave = async () => {
+    if (tempImage && croppedAreaPixels) {
+      try {
+        const croppedImage = await getCroppedImg(tempImage, croppedAreaPixels, rotation);
+        if (croppedImage) {
+          updateForm('photo', croppedImage);
+          setShowCropper(false);
+          setTempImage(null);
+        }
+      } catch (e) {
+        console.error(e);
+      }
     }
   };
 
@@ -70,20 +104,19 @@ export default function CreatePage({ params }: PageProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ amount: template.price }),
+        body: JSON.stringify({ amount: template.price || 49 }),
       });
 
       const order = await response.json();
 
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_1234567890', // Fallback for dev
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_1234567890',
         amount: order.amount,
         currency: order.currency,
         name: 'Biodata Maker',
         description: `Payment for ${template.name}`,
         order_id: order.id,
         handler: function (response: any) {
-          // Verify payment on backend ideally, but for now trust frontend
           setIsPaid(true);
           alert('Payment Successful! You can now download your biodata.');
         },
@@ -93,7 +126,7 @@ export default function CreatePage({ params }: PageProps) {
           contact: form.contactNumber,
         },
         theme: {
-          color: '#db2777',
+          color: '#C05621',
         },
       };
 
@@ -101,7 +134,6 @@ export default function CreatePage({ params }: PageProps) {
       rzp1.open();
     } catch (error) {
       console.error('Payment failed', error);
-      // For development/demo without keys, simulate success
       if (confirm('Razorpay keys missing or error. Simulate success?')) {
          setIsPaid(true);
       }
@@ -136,407 +168,388 @@ export default function CreatePage({ params }: PageProps) {
 
   if (!template) return <div className="p-8">Invalid template</div>;
 
+  const renderField = (
+    key: keyof BiodataForm, 
+    label: string, 
+    placeholder: string, 
+    type: 'text' | 'date' | 'select' = 'text',
+    options?: string[]
+  ) => (
+    <div className="bg-white p-4 rounded-lg border border-orange-100 hover:shadow-sm transition-shadow">
+      <div className="flex justify-between items-start mb-2">
+        <label className="font-semibold text-gray-700 flex items-center gap-1">
+          {label}
+          <Edit2 className="w-3 h-3 text-orange-400" />
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input 
+            type="checkbox" 
+            checked={!!fieldVisibility[key]} 
+            onChange={() => toggleVisibility(key)}
+            className="w-4 h-4 text-orange-600 rounded border-gray-300 focus:ring-orange-500"
+          />
+          <span className="text-xs text-gray-500">{t.form.includeInBiodata}</span>
+        </label>
+      </div>
+      <input
+        type={type}
+        placeholder={placeholder}
+        value={form[key] || ''}
+        onChange={e => updateForm(key, e.target.value)}
+        className="w-full border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500 text-sm"
+      />
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
+    <div className="min-h-screen bg-orange-50/30 font-sans pb-20 lg:pb-0">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" />
       
-      {/* Header */}
-      <div className="bg-white border-b shadow-sm sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Create Your Biodata</h1>
-            <p className="text-sm text-gray-600 mt-1">
-              Template: <span className="font-semibold text-pink-600">{template.name}</span>
-              {!template.free && !isPaid && (
-                <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full border border-yellow-200">
-                  ₹{template.price}
-                </span>
-              )}
-            </p>
-          </div>
-          
-          {/* Download Button */}
-          <div className="relative">
-            {!isPaid ? (
-               <button
-                onClick={handlePayment}
-                disabled={isDownloading}
-                className="flex items-center gap-2 px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-yellow-500 to-amber-600 text-white rounded-lg hover:shadow-lg transition disabled:opacity-50 font-semibold"
-              >
-                {isDownloading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-4 h-4" />}
-                <span>Pay ₹{template.price} to Download</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowDownloadMenu(!showDownloadMenu)}
-                disabled={isDownloading}
-                className="flex items-center gap-2 px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-              >
-                {isDownloading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span className="hidden md:inline">Generating...</span>
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-5 h-5" />
-                    <span>Download</span>
-                  </>
-                )}
-              </button>
-            )}
-
-            {showDownloadMenu && !isDownloading && (
-              <>
+      {/* Stepper Header */}
+      <div className="bg-white border-b sticky top-0 z-30 shadow-sm overflow-x-auto">
+        <div className="max-w-7xl mx-auto px-4 py-4 min-w-[320px]">
+          <div className="flex items-center justify-between md:justify-center md:space-x-8">
+            {steps.map((step, index) => (
+              <div key={step.id} className="flex items-center">
                 <div 
-                  className="fixed inset-0 z-10" 
-                  onClick={() => setShowDownloadMenu(false)}
-                />
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 z-20 overflow-hidden">
-                  <button
-                    onClick={() => handleDownload('pdf')}
-                    className="w-full px-4 py-3 text-left hover:bg-pink-50 transition flex items-center gap-3 border-b"
-                  >
-                    <FileText className="w-5 h-5 text-red-600" />
-                    <div>
-                      <div className="font-semibold text-sm">PDF Document</div>
-                      <div className="text-xs text-gray-500">Best for printing</div>
-                    </div>
-                  </button>
-                  
-                  <button
-                    onClick={() => handleDownload('png')}
-                    className="w-full px-4 py-3 text-left hover:bg-pink-50 transition flex items-center gap-3 border-b"
-                  >
-                    <ImageIcon className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <div className="font-semibold text-sm">PNG Image</div>
-                      <div className="text-xs text-gray-500">High quality, transparent</div>
-                    </div>
-                  </button>
-                  
-                  <button
-                    onClick={() => handleDownload('jpg')}
-                    className="w-full px-4 py-3 text-left hover:bg-pink-50 transition flex items-center gap-3"
-                  >
-                    <ImageIcon className="w-5 h-5 text-green-600" />
-                    <div>
-                      <div className="font-semibold text-sm">JPG Image</div>
-                      <div className="text-xs text-gray-500">WhatsApp ready</div>
-                    </div>
-                  </button>
+                  className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm flex-shrink-0 ${
+                    activeStep >= step.id 
+                      ? 'bg-[#C05621] text-white' 
+                      : 'bg-gray-100 text-gray-400'
+                  }`}
+                >
+                  {step.id}
                 </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-5 gap-6">
-          {/* Left - Form (3 columns) */}
-          <div className="lg:col-span-3 space-y-4 order-2 lg:order-1">
-            {/* Photo Upload Card */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                <Upload className="w-5 h-5 text-pink-600" />
-                {t.form.uploadPhoto}
-              </h3>
-              <div className="flex items-center gap-4">
-                {form.photo && (
-                  <img src={form.photo} alt="Preview" className="w-24 h-24 object-cover rounded-lg border-2 border-pink-200" />
+                <span 
+                  className={`ml-2 text-sm font-medium whitespace-nowrap ${
+                    activeStep >= step.id ? 'text-gray-900' : 'text-gray-400'
+                  }`}
+                >
+                  {step.label}
+                </span>
+                {index < steps.length - 1 && (
+                  <div className={`w-8 md:w-12 h-0.5 mx-2 md:mx-4 ${activeStep > step.id ? 'bg-[#C05621]' : 'bg-gray-200'}`} />
                 )}
-                <label className="cursor-pointer px-6 py-3 bg-gradient-to-r from-pink-100 to-purple-100 text-pink-700 rounded-lg hover:shadow-md transition flex items-center gap-2 font-semibold">
-                  <Upload className="w-4 h-4" />
-                  {form.photo ? t.form.changePhoto : t.form.choosePhoto}
-                  <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
-                </label>
               </div>
-            </div>
-
-            {/* Personal Details Card */}
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <button
-                onClick={() => toggleSection('personal')}
-                className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-pink-50 to-purple-50 hover:from-pink-100 hover:to-purple-100 transition"
-              >
-                <h3 className="text-lg font-bold text-pink-700">{t.form.personalDetails}</h3>
-                {expandedSections.personal ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-              </button>
-              
-              {expandedSections.personal && (
-                <div className="p-6 space-y-4">
-                  <input
-                    type="text"
-                    placeholder={t.form.name + " *"}
-                    value={form.name}
-                    onChange={e => updateForm('name', e.target.value)}
-                    className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                  />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input
-                      type="text"
-                      placeholder={t.form.dob + " (DD/MM/YYYY)"}
-                      value={form.dateOfBirth}
-                      onChange={e => updateForm('dateOfBirth', e.target.value)}
-                      className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                    />
-                    <input
-                      type="text"
-                      placeholder={t.form.placeOfBirth}
-                      value={form.placeOfBirth}
-                      onChange={e => updateForm('placeOfBirth', e.target.value)}
-                      className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input
-                      type="text"
-                      placeholder={t.form.height}
-                      value={form.height}
-                      onChange={e => updateForm('height', e.target.value)}
-                      className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                    />
-                    <input
-                      type="text"
-                      placeholder={t.form.caste}
-                      value={form.caste}
-                      onChange={e => updateForm('caste', e.target.value)}
-                      className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                    />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder={t.form.gotra}
-                    value={form.gotra}
-                    onChange={e => updateForm('gotra', e.target.value)}
-                    className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                  />
-                  <input
-                    type="text"
-                    placeholder={t.form.education}
-                    value={form.education}
-                    onChange={e => updateForm('education', e.target.value)}
-                    className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                  />
-                  <input
-                    type="text"
-                    placeholder={t.form.occupation}
-                    value={form.occupation}
-                    onChange={e => updateForm('occupation', e.target.value)}
-                    className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                  />
-                  <input
-                    type="text"
-                    placeholder={t.form.languages}
-                    value={form.languages}
-                    onChange={e => updateForm('languages', e.target.value)}
-                    className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                  />
-                  <input
-                    type="text"
-                    placeholder={t.form.hobbies}
-                    value={form.hobbies}
-                    onChange={e => updateForm('hobbies', e.target.value)}
-                    className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Family Details Card */}
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <button
-                onClick={() => toggleSection('family')}
-                className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-pink-50 to-purple-50 hover:from-pink-100 hover:to-purple-100 transition"
-              >
-                <h3 className="text-lg font-bold text-pink-700">{t.form.familyDetails}</h3>
-                {expandedSections.family ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-              </button>
-              
-              {expandedSections.family && (
-                <div className="p-6 space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input
-                      type="text"
-                      placeholder={t.form.fatherName}
-                      value={form.fatherName}
-                      onChange={e => updateForm('fatherName', e.target.value)}
-                      className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                    />
-                    <input
-                      type="text"
-                      placeholder={t.form.fatherOccupation}
-                      value={form.fatherOccupation}
-                      onChange={e => updateForm('fatherOccupation', e.target.value)}
-                      className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input
-                      type="text"
-                      placeholder={t.form.motherName}
-                      value={form.motherName}
-                      onChange={e => updateForm('motherName', e.target.value)}
-                      className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                    />
-                    <input
-                      type="text"
-                      placeholder={t.form.motherOccupation}
-                      value={form.motherOccupation}
-                      onChange={e => updateForm('motherOccupation', e.target.value)}
-                      className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                    />
-                  </div>
-                  
-                  {/* Optional Family Members */}
-                  <div className="border-t-2 border-gray-100 pt-4 mt-4">
-                    <button
-                      onClick={() => toggleSection('optional')}
-                      className="text-sm text-pink-600 hover:text-pink-700 font-semibold flex items-center gap-1"
-                    >
-                      {expandedSections.optional ? t.form.hideMember : t.form.addMember} {t.form.optional}
-                    </button>
-                    
-                    {expandedSections.optional && (
-                      <div className="space-y-4 mt-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <input
-                            type="text"
-                            placeholder={t.form.grandfatherName}
-                            value={form.grandfatherName}
-                            onChange={e => updateForm('grandfatherName', e.target.value)}
-                            className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                          />
-                          <input
-                            type="text"
-                            placeholder={t.form.grandfatherOccupation}
-                            value={form.grandfatherOccupation}
-                            onChange={e => updateForm('grandfatherOccupation', e.target.value)}
-                            className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <input
-                            type="text"
-                            placeholder={t.form.uncleName}
-                            value={form.uncleName}
-                            onChange={e => updateForm('uncleName', e.target.value)}
-                            className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                          />
-                          <input
-                            type="text"
-                            placeholder={t.form.uncleOccupation}
-                            value={form.uncleOccupation}
-                            onChange={e => updateForm('uncleOccupation', e.target.value)}
-                            className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <input
-                            type="text"
-                            placeholder={t.form.elderBrotherName}
-                            value={form.elderBrotherName}
-                            onChange={e => updateForm('elderBrotherName', e.target.value)}
-                            className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                          />
-                          <input
-                            type="text"
-                            placeholder={t.form.elderBrotherOccupation}
-                            value={form.elderBrotherOccupation}
-                            onChange={e => updateForm('elderBrotherOccupation', e.target.value)}
-                            className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <input
-                            type="text"
-                            placeholder={t.form.youngerBrotherName}
-                            value={form.youngerBrotherName}
-                            onChange={e => updateForm('youngerBrotherName', e.target.value)}
-                            className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                          />
-                          <input
-                            type="text"
-                            placeholder={t.form.youngerBrotherOccupation}
-                            value={form.youngerBrotherOccupation}
-                            onChange={e => updateForm('youngerBrotherOccupation', e.target.value)}
-                            className="border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Contact Details Card */}
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <button
-                onClick={() => toggleSection('contact')}
-                className="w-full px-6 py-4 flex items-center justify-between bg-gradient-to-r from-pink-50 to-purple-50 hover:from-pink-100 hover:to-purple-100 transition"
-              >
-                <h3 className="text-lg font-bold text-pink-700">{t.form.contactDetails}</h3>
-                {expandedSections.contact ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-              </button>
-              
-              {expandedSections.contact && (
-                <div className="p-6 space-y-4">
-                  <input
-                    type="text"
-                    placeholder={t.form.contactPerson}
-                    value={form.contactPerson}
-                    onChange={e => updateForm('contactPerson', e.target.value)}
-                    className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                  />
-                  <input
-                    type="text"
-                    placeholder={t.form.contactNumber}
-                    value={form.contactNumber}
-                    onChange={e => updateForm('contactNumber', e.target.value)}
-                    className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                  />
-                  <input
-                    type="email"
-                    placeholder={t.form.email}
-                    value={form.email}
-                    onChange={e => updateForm('email', e.target.value)}
-                    className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right - Live Preview (2 columns) */}
-          <div className="lg:col-span-2 order-1 lg:order-2">
-            <div className="sticky top-24">
-              <div className="bg-white rounded-xl shadow-xl p-4">
-                <div className="bg-gray-50 rounded-lg p-2 border-2 border-gray-200">
-                  <div className="overflow-auto" style={{ maxHeight: '700px' }}>
-                    {/* Scale transform for preview */}
-                    <div style={{ 
-                      transform: 'scale(0.4)', 
-                      transformOrigin: 'top left',
-                      width: '250%' // Compensate for scale(0.4) -> 1/0.4 = 2.5
-                    }}>
-                      <GenericTemplate data={form} config={template.config} />
-                    </div>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-500 text-center mt-3 flex items-center justify-center gap-1">
-                  ✨ Live Preview - Changes appear instantly
-                  {!template.free && !isPaid && <Lock className="w-3 h-3 ml-1" />}
-                </p>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Hidden template for PDF generation */}
-      <div style={{ position: 'fixed', left: '-9999px', top: 0 }}>
+      <div className="max-w-4xl mx-auto px-4 py-8">
+          
+          {/* Main Form Section - Full Width now */}
+          <div className="space-y-6">
+            
+            {/* Language & Header Info - Only show on Step 1 */}
+            {activeStep === 1 && (
+            <div className="bg-white rounded-xl shadow-sm border border-orange-100 p-4 md:p-6 space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold text-[#C05621] mb-3">{t.form.chooseLanguage}</h3>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { code: 'en', label: 'English' },
+                    { code: 'mr', label: 'मराठी' },
+                    { code: 'hi', label: 'हिंदी' },
+                    { code: 'gu', label: 'ગુજરાતી' },
+                    { code: 'te', label: 'తెలుగు' },
+                  ].map((lang) => (
+                    <button
+                      key={lang.code}
+                      onClick={() => setLanguage(lang.code as any)}
+                      className={`px-3 py-1.5 md:px-4 md:py-2 rounded-md text-sm font-medium border transition-colors ${
+                        language === lang.code 
+                          ? 'bg-[#C05621] text-white border-[#C05621]' 
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-[#C05621]'
+                      }`}
+                    >
+                      {lang.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6 pt-4 border-t border-gray-100">
+                <div>
+                  <label className="block text-sm font-semibold text-[#C05621] mb-2">{t.form.biodataTitle}</label>
+                  <input 
+                    type="text" 
+                    value={form.biodataTitle} 
+                    onChange={e => updateForm('biodataTitle', e.target.value)}
+                    className="w-full border border-gray-200 rounded-md px-3 py-2 focus:ring-1 focus:ring-orange-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[#C05621] mb-2">{t.form.godName}</label>
+                   <div className="flex gap-2">
+                      <div className="relative group w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-orange-50 flex-shrink-0">
+                         <img src="/assets/ganesha.png" alt="God" className="w-full h-full object-cover opacity-50" onError={(e) => e.currentTarget.style.display='none'} />
+                         <div className="absolute inset-0 flex items-center justify-center text-[8px] text-center text-gray-500">Photo</div>
+                      </div>
+                      <input 
+                        type="text" 
+                        value={form.godName} 
+                        onChange={e => updateForm('godName', e.target.value)}
+                        className="w-full border border-gray-200 rounded-md px-3 py-2 focus:ring-1 focus:ring-orange-500 outline-none"
+                      />
+                   </div>
+                   <button className="text-xs text-[#C05621] font-medium mt-1 hover:underline">
+                      {t.form.changeGodPhoto}
+                   </button>
+                </div>
+              </div>
+            </div>
+            )}
+
+            {/* Step 1: Personal Details */}
+            {activeStep === 1 && (
+              <div className="space-y-6">
+                <div className="bg-orange-50/50 p-4 rounded-t-xl border-b border-orange-100">
+                  <h2 className="text-lg font-bold text-[#8B4513] flex items-center gap-2">
+                    {t.form.personalDetails} <Edit2 className="w-4 h-4" />
+                  </h2>
+                </div>
+                
+                <div className="space-y-4">
+                  {renderField('name', t.form.name, 'Enter your full name')}
+                  
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {renderField('dateOfBirth', t.form.dob, 'DD/MM/YYYY')}
+                    {renderField('timeOfBirth', t.form.timeOfBirth, 'e.g. 10:30 AM')}
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {renderField('height', t.form.height, 'e.g. 5\'8" or 173 cm')}
+                    {renderField('placeOfBirth', t.form.placeOfBirth, 'City, State')}
+                  </div>
+
+                  {renderField('religious', t.form.religious, 'Select your Religion')}
+                  {renderField('caste', t.form.caste, 'Select your Caste')}
+                  {renderField('rashi', t.form.rashi, 'Select your Rashi (Zodiac sign)')}
+                  {renderField('nakshatra', t.form.nakshatra, 'Select your Nakshatra')}
+                  {renderField('manglik', t.form.manglik, 'Select your Manglik status')}
+                  {renderField('gotra', t.form.gotra, 'Select your Gotra')}
+                  {renderField('gan', t.form.gan, 'Select your Gan')}
+                  {renderField('complexion', t.form.complexion, 'Select your Complexion')}
+                  {renderField('bloodGroup', t.form.bloodGroup, 'Select your Blood Group')}
+                  {renderField('education', t.form.education, 'e.g. B.Tech in Computer Science')}
+                  {renderField('occupation', t.form.occupation, 'e.g. Software Engineer at TCS')}
+                  {renderField('salary', t.form.salary, 'Annual salary in INR')}
+                  
+                   <button className="w-full py-3 border-2 border-dashed border-orange-200 text-[#C05621] rounded-lg font-medium hover:bg-orange-50 transition-colors">
+                      {t.form.addNewField}
+                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Family Details */}
+            {activeStep === 2 && (
+              <div className="space-y-6">
+                <div className="bg-orange-50/50 p-4 rounded-t-xl border-b border-orange-100">
+                  <h2 className="text-lg font-bold text-[#8B4513] flex items-center gap-2">
+                    {t.form.familyDetails} <Edit2 className="w-4 h-4" />
+                  </h2>
+                </div>
+                
+                <div className="space-y-4">
+                  {renderField('fatherName', t.form.fatherName, "Father's Full Name")}
+                  {renderField('fatherOccupation', t.form.fatherOccupation, "Father's Occupation")}
+                  {renderField('motherName', t.form.motherName, "Mother's Full Name")}
+                  {renderField('motherOccupation', t.form.motherOccupation, "Mother's Occupation")}
+                  {renderField('brothers', 'Brothers', "e.g., 1 Elder, Working in USA")}
+                  {renderField('sisters', 'Sisters', "e.g., 2, 1 Married")}
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Contact Details */}
+            {activeStep === 3 && (
+              <div className="space-y-6">
+                 <div className="bg-orange-50/50 p-4 rounded-t-xl border-b border-orange-100">
+                  <h2 className="text-lg font-bold text-[#8B4513] flex items-center gap-2">
+                    {t.form.contactDetails} <Edit2 className="w-4 h-4" />
+                  </h2>
+                </div>
+
+                <div className="space-y-4">
+                  {renderField('contactPerson', t.form.contactPerson, "Contact Person Name")}
+                  {renderField('contactNumber', t.form.contactNumber, "Mobile Number")}
+                  {renderField('email', t.form.email, "Email Address")}
+                  {renderField('address', 'Address', "Residential Address")}
+                  
+                  {/* Photo Upload with Tips */}
+                  <div className="grid md:grid-cols-2 gap-6">
+                     <div className="bg-white p-6 rounded-lg border border-orange-100 text-center">
+                        <h4 className="font-semibold text-gray-700 mb-4">{t.form.choosePhoto}</h4>
+                         <div className="flex flex-col items-center gap-4">
+                            <div className="relative w-32 h-32 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center border border-gray-200">
+                              {form.photo ? (
+                                <img src={form.photo} alt="Preview" className="w-full h-full object-cover" />
+                              ) : (
+                                <ImageIcon className="w-8 h-8 text-gray-400" />
+                              )}
+                            </div>
+                            <label className="cursor-pointer px-6 py-2 bg-[#C05621] text-white rounded-lg hover:bg-[#9C4215] transition shadow-sm flex items-center gap-2 text-sm font-medium">
+                              <Upload className="w-4 h-4" />
+                              {t.form.uploadPhoto}
+                              <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
+                            </label>
+                            <p className="text-xs text-gray-500">Upload your profile photo, biodata with photos get more attention.</p>
+                        </div>
+                     </div>
+
+                     <div className="bg-orange-50 p-6 rounded-lg border border-orange-100">
+                        <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                           <span className="text-lg">📸</span> Photo Tips
+                        </h4>
+                        <ul className="text-xs space-y-2 text-gray-600 list-disc pl-4">
+                           <li>Use a clear, recent photo with good lighting</li>
+                           <li>Face should be clearly visible and centered</li>
+                           <li>Avoid group photos or heavily filtered images</li>
+                           <li>Professional or formal attire recommended</li>
+                           <li>Image will be cropped to 4:5 ratio automatically</li>
+                        </ul>
+                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: Preview */}
+            {activeStep === 4 && (
+              <div className="space-y-6">
+                 <div className="bg-orange-50/50 p-4 rounded-t-xl border-b border-orange-100 flex justify-between items-center">
+                  <h2 className="text-lg font-bold text-[#8B4513] flex items-center gap-2">
+                    Biodata Preview
+                  </h2>
+                </div>
+                
+                <div className="bg-gray-100 p-8 rounded-xl border border-gray-200 overflow-auto flex justify-center">
+                   <div style={{ transform: 'scale(0.6)', transformOrigin: 'top center', height: '700px', width: '794px' }}>
+                      <GenericTemplate data={form} config={template.config} />
+                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Navigation Buttons */}
+            <div className="flex flex-col-reverse md:flex-row justify-between items-center pt-6 border-t border-gray-200 mt-8 gap-4 pb-12">
+               <button 
+                  onClick={() => setForm(defaultBiodataForm)}
+                  className="flex items-center gap-2 text-gray-500 hover:text-red-500 font-medium text-sm transition-colors"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  {t.form.resetForm}
+                </button>
+                
+                <div className="flex gap-3 w-full md:w-auto">
+                   {activeStep > 1 && (
+                      <button 
+                        onClick={() => setActiveStep(prev => prev - 1)}
+                        className="flex-1 md:flex-none px-6 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
+                      >
+                        Previous
+                      </button>
+                   )}
+                   
+                   {activeStep < 4 ? (
+                      <button 
+                        onClick={() => setActiveStep(prev => prev + 1)}
+                        className="flex-1 md:flex-none px-8 py-2.5 bg-[#C05621] text-white rounded-lg font-semibold hover:bg-[#9C4215] transition-colors shadow-sm flex items-center justify-center gap-2"
+                      >
+                        {t.form.nextStep}
+                      </button>
+                   ) : (
+                     <div className="relative w-full md:w-auto">
+                         {!isPaid ? (
+                           <button
+                             onClick={handlePayment}
+                             disabled={isDownloading}
+                             className="w-full md:w-auto px-8 py-2.5 bg-[#C05621] text-white rounded-lg font-semibold hover:bg-[#9C4215] transition-colors shadow-sm flex items-center justify-center gap-2"
+                           >
+                             {isDownloading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-4 h-4" />}
+                             Pay to Download
+                           </button>
+                         ) : (
+                           <button
+                             onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                             disabled={isDownloading}
+                             className="w-full md:w-auto px-8 py-2.5 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-sm flex items-center justify-center gap-2"
+                           >
+                             <Download className="w-5 h-5" />
+                             Download
+                           </button>
+                         )}
+                         
+                         {showDownloadMenu && (
+                           <div className="absolute right-0 bottom-full mb-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden z-50">
+                             <button onClick={() => handleDownload('pdf')} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-sm">PDF</button>
+                             <button onClick={() => handleDownload('png')} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-sm">PNG</button>
+                             <button onClick={() => handleDownload('jpg')} className="w-full px-4 py-2 text-left hover:bg-gray-50 text-sm">JPG</button>
+                           </div>
+                         )}
+                     </div>
+                   )}
+                </div>
+            </div>
+          </div>
+      </div>
+
+       {/* Cropper Modal */}
+       {showCropper && tempImage && (
+        <div className="fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="font-bold text-lg">Crop Your Photo</h3>
+              <button onClick={() => setShowCropper(false)}><X className="w-5 h-5" /></button>
+            </div>
+            <div className="relative h-80 bg-gray-900">
+               <Cropper
+                  image={tempImage}
+                  crop={crop}
+                  zoom={zoom}
+                  aspect={4 / 5}
+                  onCropChange={setCrop}
+                  onCropComplete={onCropComplete}
+                  onZoomChange={setZoom}
+               />
+            </div>
+            <div className="p-4 space-y-4">
+               <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase">Zoom</label>
+                  <input
+                    type="range"
+                    value={zoom}
+                    min={1}
+                    max={3}
+                    step={0.1}
+                    aria-labelledby="Zoom"
+                    onChange={(e) => setZoom(Number(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#C05621]"
+                  />
+               </div>
+               <div className="flex gap-3 justify-end pt-2">
+                  <button 
+                    onClick={() => setShowCropper(false)}
+                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleCropSave}
+                    className="px-6 py-2 bg-[#C05621] text-white rounded-lg font-medium hover:bg-[#9C4215]"
+                  >
+                    Apply
+                  </button>
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+       {/* Hidden template for PDF generation */}
+       <div style={{ position: 'fixed', left: '-9999px', top: 0 }}>
         <GenericTemplate data={form} config={template.config} id="biodata-template" />
       </div>
     </div>

@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { translations, TranslationType } from "../i18n/translations";
 
-type Language = "en" | "hi" | "mr" | "kn";
+type Language = "en" | "hi" | "mr" | "kn" | "gu" | "te";
 
 interface LanguageContextType {
   language: Language;
