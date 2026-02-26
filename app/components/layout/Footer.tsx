@@ -73,7 +73,7 @@ export default function Footer() {
           <div className="flex flex-col md:flex-row justify-center items-center gap-4">
             <div className="flex items-center gap-2">
               <Mail className="w-3 h-3" />
-              <span>Email: contact@biodatamaker.com</span>
+              <span>Email: support@biodatamaker.app</span>
             </div>
             <div className="hidden md:block">|</div>
              <div>Telegram: @biodatamaker</div>
@@ -81,7 +81,7 @@ export default function Footer() {
           
           <div className="flex items-center justify-center gap-2">
             <MapPin className="w-3 h-3" />
-            <span>Pune</span>
+            <span>Delhi - 110088</span>
           </div>
 
           <div className="pt-4">
