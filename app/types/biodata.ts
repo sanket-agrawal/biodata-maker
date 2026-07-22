@@ -41,6 +41,9 @@ export type BiodataForm = {
   
   // Photo
   photo?: string; // base64 or URL
+
+  // Custom Fields (user defined)
+  customFields?: { id: string; label: string; value: string; section?: 'personal' | 'family' | 'contact' }[];
 };
 
 export type FieldVisibility = {

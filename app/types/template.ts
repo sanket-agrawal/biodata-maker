@@ -5,6 +5,8 @@ export type TemplateColorTheme = {
   background: string;
   accent: string;
   border: string;
+  headerBg?: string;
+  headerText?: string;
 };
 
 export type TemplateFont = {
@@ -12,7 +14,7 @@ export type TemplateFont = {
   body: string;
 };
 
-export type TemplateLayout = 'classic' | 'modern-sidebar' | 'centered' | 'minimal';
+export type TemplateLayout = 'classic' | 'modern-sidebar' | 'centered' | 'minimal' | 'royal-grid' | 'circle-avatar-center';
 
 export type TemplateConfig = {
   id: number;
@@ -20,9 +22,10 @@ export type TemplateConfig = {
   layout: TemplateLayout;
   colors: TemplateColorTheme;
   fonts: TemplateFont;
-  borderStyle: 'none' | 'simple' | 'double' | 'decorated';
-  headerStyle: 'simple' | 'boxed' | 'underlined' | 'centered-box';
-  sectionStyle: 'simple' | 'boxed' | 'underlined' | 'background';
+  borderStyle: 'none' | 'simple' | 'double' | 'decorated' | 'ornate-gold' | 'royal-vintage' | 'mandala' | 'gold-filigree-corners';
+  headerStyle: 'simple' | 'boxed' | 'underlined' | 'centered-box' | 'royal-banner' | 'sacred-header' | 'center-title-maroon';
+  sectionStyle: 'simple' | 'boxed' | 'underlined' | 'background' | 'ribbon' | 'gold-accent' | 'cursive-center';
+  symbol?: 'ganesha' | 'om' | 'swastik' | 'radha-krishna' | 'lotus' | 'none';
   showPhoto: boolean;
   watermark?: string;
 };
