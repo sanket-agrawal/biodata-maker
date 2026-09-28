@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { templates } from "@/app/data/templates";
 import GenericTemplate from "../templates/GenericTemplate";
 import { defaultBiodataForm } from "@/app/types/biodata";
 import Link from "next/link";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles, Crown, TrendingUp } from "lucide-react";
 
 export default function TemplateSection() {
   // Sample realistic candidate profiles for template preview showcase
@@ -91,15 +91,26 @@ export default function TemplateSection() {
         </p>
       </div>
 
-      {/* Grid of Realistic Full Biodata Previews (Matching Image 4) */}
+      {/* Grid of Realistic Full Biodata Previews */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
         {templates.slice(0, 6).map((template, index) => {
           const candidateData = candidates[index % candidates.length];
+          const discount = template.originalPrice && template.price 
+            ? Math.round(((template.originalPrice - template.price) / template.originalPrice) * 100)
+            : 0;
+          
           return (
             <div key={template.id} className="group flex flex-col items-center">
               <Link href={`/create/${template.id}`} className="w-full">
                 <div className="bg-white rounded-2xl shadow-md hover:shadow-2xl transition-all duration-500 overflow-hidden border border-orange-100 flex flex-col relative group-hover:-translate-y-1">
                   
+                  {/* Discount Badge */}
+                  {discount > 0 && (
+                    <div className="absolute top-3 right-3 z-20 bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg animate-pulse">
+                      {discount}% OFF
+                    </div>
+                  )}
+
                   {/* Full Document Aspect Container */}
                   <div className="relative aspect-[1/1.414] bg-gray-50 overflow-hidden">
                     
@@ -117,12 +128,12 @@ export default function TemplateSection() {
                         <ArrowRight className="w-4 h-4" />
                       </span>
                       <p className="text-xs text-white/90 mt-2 font-medium">
-                        {template.free ? 'Free Download' : `Premium Template – ₹${template.price}`}
+                        {template.free ? 'Free Download' : `Premium Template`}
                       </p>
                     </div>
                   </div>
 
-                  {/* Card Title & Tagline */}
+                  {/* Card Title & Tagline with Price Anchoring */}
                   <div className="p-4 bg-white border-t border-gray-100 flex items-center justify-between">
                     <div>
                       <h3 className="font-bold text-gray-900 text-base group-hover:text-orange-600 transition">
@@ -138,9 +149,17 @@ export default function TemplateSection() {
                         FREE
                       </span>
                     ) : (
-                      <span className="text-xs font-extrabold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-full">
-                        ₹{template.price}
-                      </span>
+                      <div className="flex flex-col items-end">
+                        {template.originalPrice && (
+                          <span className="text-[10px] text-gray-400 line-through font-medium">
+                            {'\u20B9'}{template.originalPrice}
+                          </span>
+                        )}
+                        <span className="text-sm font-extrabold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                          <Crown className="w-3 h-3 text-amber-600" />
+                          {'\u20B9'}{template.price}
+                        </span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -159,6 +178,10 @@ export default function TemplateSection() {
           <span>View All 15+ Templates</span>
           <ArrowRight className="w-4 h-4" />
         </Link>
+        <p className="mt-3 text-xs text-gray-500 flex items-center justify-center gap-1.5">
+          <TrendingUp className="w-3 h-3 text-emerald-500" />
+          <span>Premium templates from <span className="line-through text-gray-400">{'\u20B9'}199</span> <span className="font-bold text-emerald-700">{'\u20B9'}49</span> — Limited time offer</span>
+        </p>
       </div>
     </section>
   );

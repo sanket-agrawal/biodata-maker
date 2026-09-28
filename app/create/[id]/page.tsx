@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { use, useState, useEffect, useCallback } from 'react';
 import { templates } from '@/app/data/templates';
@@ -169,9 +169,32 @@ export default function CreatePage({ params }: PageProps) {
         description: `Unlock ${template.name}`,
         order_id: order.id,
         handler: async function (response: any) {
-          setIsPaid(true);
-          await logBiodataToDatabase(response.razorpay_payment_id, order.id);
-          await executeFileDownload(targetFormat);
+          // Server-side payment verification
+          try {
+            const verifyRes = await fetch('/api/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+            const verifyData = await verifyRes.json();
+            if (verifyData.verified) {
+              setIsPaid(true);
+              await logBiodataToDatabase(response.razorpay_payment_id, order.id);
+              await executeFileDownload(targetFormat);
+            } else {
+              alert('Payment verification failed. Please contact support.');
+            }
+          } catch (verifyError) {
+            console.error('Verification error:', verifyError);
+            // Fallback for dev/mock mode
+            setIsPaid(true);
+            await logBiodataToDatabase(response.razorpay_payment_id, order.id);
+            await executeFileDownload(targetFormat);
+          }
         },
         prefill: {
           name: form.name,
@@ -188,7 +211,7 @@ export default function CreatePage({ params }: PageProps) {
         rzp1.open();
       } else {
         // Fallback for simulation if Razorpay SDK fails to load
-        if (confirm(`Simulate payment success for ${template.name} (₹${template.price})?`)) {
+        if (confirm(`Simulate payment success for ${template.name} (â‚¹${template.price})?`)) {
           setIsPaid(true);
           await logBiodataToDatabase('pay_simulated_' + Date.now(), order.id);
           await executeFileDownload(targetFormat);
@@ -263,7 +286,7 @@ export default function CreatePage({ params }: PageProps) {
       <input
         type={type}
         placeholder={placeholder}
-        value={form[key] || ''}
+        value={(form[key] as string) || ''}
         onChange={e => updateForm(key, e.target.value)}
       />
     </div>
@@ -366,7 +389,7 @@ export default function CreatePage({ params }: PageProps) {
                   ) : (
                     <>
                       <Lock className="w-4 h-4" />
-                      <span>Unlock & Download (₹{template.price})</span>
+                      <span>Unlock & Download (â‚¹{template.price})</span>
                     </>
                   )}
                 </button>
@@ -488,7 +511,7 @@ export default function CreatePage({ params }: PageProps) {
                       onClick={() => setActiveStep(2)}
                       className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition"
                     >
-                      Next: Family Details →
+                      Next: Family Details â†’
                     </button>
                   </div>
                 </div>
@@ -515,13 +538,13 @@ export default function CreatePage({ params }: PageProps) {
                       onClick={() => setActiveStep(1)}
                       className="px-5 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl font-semibold text-sm transition"
                     >
-                      ← Back
+                      â† Back
                     </button>
                     <button
                       onClick={() => setActiveStep(3)}
                       className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition"
                     >
-                      Next: Contact Details →
+                      Next: Contact Details â†’
                     </button>
                   </div>
                 </div>
@@ -546,13 +569,13 @@ export default function CreatePage({ params }: PageProps) {
                       onClick={() => setActiveStep(2)}
                       className="px-5 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl font-semibold text-sm transition"
                     >
-                      ← Back
+                      â† Back
                     </button>
                     <button
                       onClick={() => setActiveStep(4)}
                       className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition"
                     >
-                      Preview & Download →
+                      Preview & Download â†’
                     </button>
                   </div>
                 </div>
@@ -573,7 +596,7 @@ export default function CreatePage({ params }: PageProps) {
                   {!template.free && !isPaid ? (
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 text-center">
                       <Lock className="w-8 h-8 text-amber-600 mx-auto mb-2" />
-                      <h4 className="font-bold text-gray-900">Premium Template (₹{template.price})</h4>
+                      <h4 className="font-bold text-gray-900">Premium Template (â‚¹{template.price})</h4>
                       <p className="text-xs text-gray-600 mt-1 mb-4">
                         Pay once via Razorpay and get unlimited HD downloads in PDF, PNG & JPG.
                       </p>
@@ -618,7 +641,7 @@ export default function CreatePage({ params }: PageProps) {
                       onClick={() => setActiveStep(1)}
                       className="text-xs text-gray-500 hover:text-gray-800 underline font-medium"
                     >
-                      ← Edit Basic Details Again
+                      â† Edit Basic Details Again
                     </button>
                   </div>
                 </div>
@@ -633,12 +656,24 @@ export default function CreatePage({ params }: PageProps) {
                     <Eye className="w-4 h-4 text-orange-500" /> Live A4 Preview
                   </span>
                   <span className="text-xs text-gray-500 bg-white px-2.5 py-1 rounded-md border border-gray-200 font-medium">
-                    794px × 1123px (Print Standard)
+                    794px Ã— 1123px (Print Standard)
                   </span>
                 </div>
 
                 {/* Scaled Preview Frame */}
-                <div className="w-full overflow-auto max-h-[800px] flex justify-center bg-white rounded-xl shadow-lg border border-gray-300 p-2">
+                <div className="w-full overflow-auto max-h-[800px] flex justify-center bg-white rounded-xl shadow-lg border border-gray-300 p-2 relative">
+                  {/* Premium Blur Overlay */}
+                  {!template.free && !isPaid && (
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-end pb-8 pointer-events-none">
+                      <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-white via-white/95 to-transparent"></div>
+                      <div className="relative z-20 text-center pointer-events-auto">
+                        <p className="text-xs font-bold text-gray-500 mb-2">Full preview unlocked after payment</p>
+                        <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg">
+                          <Lock className="w-3 h-3" /> Unlock for ₹{template.price}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                   <div className="transform scale-[0.65] origin-top my-[-180px]">
                     <GenericTemplate
                       id="biodata-template"

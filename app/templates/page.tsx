@@ -1,11 +1,11 @@
-'use client';
+﻿"use client";
 
-import { useState } from 'react';
-import { templates } from '@/app/data/templates';
-import GenericTemplate from '@/app/components/templates/GenericTemplate';
-import { defaultBiodataForm } from '@/app/types/biodata';
-import Link from 'next/link';
-import { Sparkles, Crown, CheckCircle2, ArrowRight } from 'lucide-react';
+import { useState } from "react";
+import { templates } from "@/app/data/templates";
+import GenericTemplate from "../components/templates/GenericTemplate";
+import { defaultBiodataForm } from "@/app/types/biodata";
+import Link from "next/link";
+import { ArrowRight, CheckCircle2, Crown, TrendingUp, Star, ShieldCheck } from "lucide-react";
 
 export default function TemplatesPage() {
   const [filter, setFilter] = useState<'all' | 'free' | 'premium'>('all');
@@ -16,7 +16,7 @@ export default function TemplatesPage() {
     return true;
   });
 
-  // Candidate profiles for realistic document preview rendering
+  // Sample candidate data
   const candidates = [
     {
       ...defaultBiodataForm,
@@ -30,8 +30,6 @@ export default function TemplatesPage() {
       gotra: "Mittal",
       education: "MD from Amity University",
       occupation: "Marketing Manager - Zomato",
-      languages: "Hindi, English",
-      hobbies: "Photography, Politics, Fitness",
       fatherName: "Dr. SD Kumar Singh",
       fatherOccupation: "Retired Maths Professor",
       motherName: "Smt. Madhu Singh",
@@ -47,7 +45,6 @@ export default function TemplatesPage() {
       godName: '|| Shree Ganeshay Namah ||',
       name: "Mahima Jain Aggarwal",
       dateOfBirth: "05 November 1995",
-      timeOfBirth: "07:20 PM",
       placeOfBirth: "New Delhi",
       height: "5 feet 5 inches",
       religious: "Hindu",
@@ -125,6 +122,15 @@ export default function TemplatesPage() {
           <p className="text-gray-600 text-sm sm:text-base">
             Select from 3 100% Free templates or 12 Ultra-Premium designs with golden borders, Ganesha motifs, and instant PDF/WhatsApp download.
           </p>
+          {/* Pricing Banner */}
+          <div className="mt-4 inline-flex items-center gap-2 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-full px-5 py-2">
+            <TrendingUp className="w-4 h-4 text-emerald-600" />
+            <span className="text-sm text-gray-700">
+              Premium from <span className="line-through text-gray-400 font-medium">{'\u20B9'}199</span>{' '}
+              <span className="font-extrabold text-orange-600">{'\u20B9'}49</span>
+            </span>
+            <span className="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded font-bold">SALE</span>
+          </div>
         </div>
 
         {/* Filter Tab Bar */}
@@ -161,10 +167,14 @@ export default function TemplatesPage() {
           </button>
         </div>
 
-        {/* Template Grid of Full Document Previews (Matching Image 4) */}
+        {/* Template Grid */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-10">
           {filteredTemplates.map((template, index) => {
             const candidateData = candidates[index % candidates.length];
+            const discount = template.originalPrice && template.price 
+              ? Math.round(((template.originalPrice - template.price) / template.originalPrice) * 100)
+              : 0;
+
             return (
               <div
                 key={template.id}
@@ -180,11 +190,25 @@ export default function TemplatesPage() {
                         <CheckCircle2 className="w-3 h-3" /> FREE
                       </span>
                     ) : (
-                      <span className="bg-amber-500 text-white text-[11px] font-extrabold px-3 py-1 rounded-full shadow flex items-center gap-1">
-                        <Crown className="w-3 h-3 text-yellow-200" /> ₹{template.price}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className="bg-amber-500 text-white text-[11px] font-extrabold px-3 py-1 rounded-full shadow flex items-center gap-1">
+                          <Crown className="w-3 h-3 text-yellow-200" /> {'\u20B9'}{template.price}
+                        </span>
+                        {template.originalPrice && (
+                          <span className="text-[10px] text-gray-500 line-through bg-white/90 px-2 py-0.5 rounded-full text-center">
+                            {'\u20B9'}{template.originalPrice}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
+
+                  {/* Discount Badge */}
+                  {discount > 0 && (
+                    <div className="absolute top-3 right-3 z-20 bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg">
+                      {discount}% OFF
+                    </div>
+                  )}
 
                   {/* Render Actual Scaled A4 Template Document */}
                   <div className="absolute inset-0 flex items-start justify-center overflow-hidden pointer-events-none select-none">
@@ -226,6 +250,24 @@ export default function TemplatesPage() {
               </div>
             );
           })}
+        </div>
+
+        {/* Bottom Trust Strip */}
+        <div className="mt-16 text-center">
+          <div className="inline-flex flex-wrap items-center justify-center gap-6 text-xs text-gray-500 bg-gray-50 rounded-2xl px-6 py-4 border border-gray-100">
+            <div className="flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-500" />
+              <span>Secure Razorpay Payments</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-blue-500" />
+              <span>7-Day Money-Back Guarantee</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Star className="w-4 h-4 text-yellow-500 fill-current" />
+              <span>4.9/5 from 2,847 reviews</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

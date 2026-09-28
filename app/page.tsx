@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import HeroSection from './components/home/HeroSection';
 import TemplateSection from './components/home/TemplateSection';
@@ -11,6 +11,9 @@ import Tips from './components/content/Tips';
 import FAQ from './components/content/FAQ';
 import Testimonials from './components/content/Testimonials';
 import FinalCTA from './components/content/FinalCTA';
+import TrustBadges from './components/ui/TrustBadges';
+import ExitIntentPopup from './components/ui/ExitIntentPopup';
+import StickyMobileCTA from './components/ui/StickyMobileCTA';
 
 export default function Home() {
   const scrollToTemplates = () => {
@@ -23,6 +26,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white font-sans">
       <HeroSection onStart={scrollToTemplates}/>
+      <TrustBadges />
       <TemplateSection />
       <WhatItDoes />
       <TargetAudience />
@@ -30,9 +34,11 @@ export default function Home() {
       <BiodataFormat />
       <WhyChooseUs />
       <Tips />
-      <FAQ />
       <Testimonials />
+      <FAQ />
       <FinalCTA />
+      <ExitIntentPopup />
+      <StickyMobileCTA />
     </div>
   );
 }

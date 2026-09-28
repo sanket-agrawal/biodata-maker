@@ -1,4 +1,4 @@
-import { TemplateConfig } from '@/app/types/template';
+﻿import { TemplateConfig } from '@/app/types/template';
 
 export type Template = {
   id: number;
@@ -6,6 +6,7 @@ export type Template = {
   category: 'basic' | 'premium';
   free: boolean;
   price?: number;
+  originalPrice?: number;
   thumbnailColor: string;
   tagline: string;
   config: TemplateConfig;
@@ -58,57 +59,70 @@ export const templates: Template[] = [
     category: 'premium',
     free: false,
     price: 79,
-    tagline: 'Centered circular portrait frame with royal golden filigree corners & Ganesha motif',
-    thumbnailColor: 'from-amber-300 via-yellow-100 to-red-700',
-    config: createConfig(
-      16,
-      'Agrawal Royal Gold Filigree',
-      'circle-avatar-center',
-      '#991b1b',
-      '#fff7ed',
-      'Playfair Display, Georgia, serif',
-      'Arial, sans-serif',
-      'gold-filigree-corners',
-      'center-title-maroon',
-      'cursive-center',
-      'ganesha',
-      '#991b1b',
-      '#ffffff'
-    ),
+    originalPrice: 349,
+    tagline: 'Exquisite gold filigree corners on rich ivory paper with maroon headers',
+    thumbnailColor: 'from-amber-700 via-yellow-300 to-red-900',
+    config: {
+      ...createConfig(
+        16,
+        'Agrawal Royal Gold Filigree',
+        'classic',
+        '#8B0000',
+        '#FFFDF5',
+        'Playfair Display, Georgia, serif',
+        'Georgia, serif',
+        'gold-filigree-corners',
+        'center-title-maroon',
+        'cursive-center',
+        'ganesha',
+        '#8B0000',
+        '#FFD700'
+      ),
+      colors: {
+        primary: '#8B0000',
+        secondary: '#FFFDF5',
+        text: '#3B2010',
+        background: '#FFFDF5',
+        accent: '#C8963E',
+        border: '#C8963E',
+        headerBg: '#8B0000',
+        headerText: '#FFD700',
+      },
+    },
   },
 
-  // --- 3 FREE TEMPLATES ---
+  // --- 3 FREE BASIC TEMPLATES ---
   {
     id: 1,
-    name: 'Classic Floral Simple',
+    name: 'Classic Elegant',
     category: 'basic',
     free: true,
-    tagline: 'Clean traditional design with soft gold floral accents',
-    thumbnailColor: 'from-amber-100 via-rose-50 to-orange-100',
+    tagline: 'Clean professional design with warm amber headers',
+    thumbnailColor: 'from-amber-100 via-orange-100 to-amber-50',
     config: createConfig(
       1,
-      'Classic Floral Simple',
+      'Classic Elegant',
       'classic',
-      '#9a3412',
-      '#fff7ed',
+      '#92400e',
+      '#fffbeb',
       'Georgia, serif',
       'Arial, sans-serif',
-      'double',
-      'underlined',
-      'background',
+      'simple',
+      'boxed',
+      'simple',
       'ganesha'
     ),
   },
   {
     id: 2,
-    name: 'Modern Minimalist',
+    name: 'Modern Minimal',
     category: 'basic',
     free: true,
-    tagline: 'Sleek contemporary look with crisp typography',
-    thumbnailColor: 'from-blue-100 via-slate-50 to-indigo-100',
+    tagline: 'Sleek contemporary look with blue accents',
+    thumbnailColor: 'from-blue-50 via-indigo-50 to-white',
     config: createConfig(
       2,
-      'Modern Minimalist',
+      'Modern Minimal',
       'minimal',
       '#2563eb',
       '#eff6ff',
@@ -149,6 +163,7 @@ export const templates: Template[] = [
     category: 'premium',
     free: false,
     price: 49,
+    originalPrice: 199,
     tagline: 'Shining golden ornate borders & crimson velvet accents',
     thumbnailColor: 'from-amber-400 via-yellow-200 to-red-600',
     config: createConfig(
@@ -173,6 +188,7 @@ export const templates: Template[] = [
     category: 'premium',
     free: false,
     price: 99,
+    originalPrice: 499,
     tagline: 'Midnight dark background with sparkling metallic gold framing',
     thumbnailColor: 'from-gray-900 via-black to-amber-500',
     config: {
@@ -209,6 +225,7 @@ export const templates: Template[] = [
     category: 'premium',
     free: false,
     price: 59,
+    originalPrice: 249,
     tagline: 'Sacred Ganesha motif with warm saffron & royal maroon theme',
     thumbnailColor: 'from-orange-500 via-amber-300 to-rose-700',
     config: createConfig(
@@ -233,6 +250,7 @@ export const templates: Template[] = [
     category: 'premium',
     free: false,
     price: 69,
+    originalPrice: 299,
     tagline: 'Deep royal emerald green with ornate gold corner artwork',
     thumbnailColor: 'from-emerald-800 via-teal-600 to-amber-200',
     config: createConfig(
@@ -257,6 +275,7 @@ export const templates: Template[] = [
     category: 'premium',
     free: false,
     price: 79,
+    originalPrice: 349,
     tagline: 'Authentic parchment paper scroll aesthetic with antique borders',
     thumbnailColor: 'from-amber-200 via-yellow-100 to-amber-300',
     config: {
@@ -293,6 +312,7 @@ export const templates: Template[] = [
     category: 'premium',
     free: false,
     price: 89,
+    originalPrice: 399,
     tagline: 'Blessed Radha-Krishna motif with maroon & golden royal borders',
     thumbnailColor: 'from-rose-500 via-purple-300 to-amber-400',
     config: createConfig(
@@ -317,6 +337,7 @@ export const templates: Template[] = [
     category: 'premium',
     free: false,
     price: 59,
+    originalPrice: 249,
     tagline: 'Deep navy blue with silver-gold double border frame',
     thumbnailColor: 'from-blue-900 via-indigo-700 to-slate-200',
     config: createConfig(
@@ -341,6 +362,7 @@ export const templates: Template[] = [
     category: 'premium',
     free: false,
     price: 49,
+    originalPrice: 199,
     tagline: 'Warm marigold yellow with auspicious red marriage frame',
     thumbnailColor: 'from-amber-500 via-yellow-400 to-red-500',
     config: createConfig(
@@ -365,6 +387,7 @@ export const templates: Template[] = [
     category: 'premium',
     free: false,
     price: 69,
+    originalPrice: 299,
     tagline: 'Delicate soft pink floral borders with rose gold highlights',
     thumbnailColor: 'from-pink-300 via-rose-100 to-amber-200',
     config: createConfig(
@@ -389,6 +412,7 @@ export const templates: Template[] = [
     category: 'premium',
     free: false,
     price: 79,
+    originalPrice: 349,
     tagline: 'Royal bridal crimson with golden Om/Ganesha emblem',
     thumbnailColor: 'from-red-700 via-rose-500 to-yellow-300',
     config: createConfig(
@@ -413,6 +437,7 @@ export const templates: Template[] = [
     category: 'premium',
     free: false,
     price: 89,
+    originalPrice: 399,
     tagline: 'Majestic peacock teal & gold decorative border design',
     thumbnailColor: 'from-teal-700 via-emerald-500 to-yellow-200',
     config: createConfig(
@@ -437,6 +462,7 @@ export const templates: Template[] = [
     category: 'premium',
     free: false,
     price: 99,
+    originalPrice: 499,
     tagline: 'Ultra-luxurious platinum grey frame with regal gold accents',
     thumbnailColor: 'from-slate-800 via-gray-400 to-amber-300',
     config: createConfig(
